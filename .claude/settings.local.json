@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat ~/Documents/company/.current 2>/dev/null; echo \"---\"; ls -la /Users/kayu/Documents/company/career-advisor/research/ 2>/dev/null || echo \"research dir not found\")",
+      "WebSearch"
+    ]
+  }
+}
