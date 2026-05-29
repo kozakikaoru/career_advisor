@@ -16,7 +16,11 @@ export function Roadmap({ roadmap }: { roadmap: CareerPlan["roadmap"] }) {
 
         <div className="space-y-0">
           {roadmap.map((node, i) => (
-            <RoadmapNode key={`${node.timeLabel}-${i}`} node={node} />
+            <RoadmapNode
+              key={`${node.timeLabel}-${i}`}
+              node={node}
+              isLast={i === roadmap.length - 1}
+            />
           ))}
         </div>
       </div>

@@ -6,9 +6,15 @@ import type { RoadmapNode as RoadmapNodeType } from "@/lib/schema/result";
  *   milestone= パネル枠 + timeLabel(violet 文字)
  *   goal     = バイオレット→ピンクのグラデ円 + 🏆
  * road-line は CSS(::before)で次ノードへの縦線を描く。最後の要素は :last-child で消える。
+ * 下余白(pb-8)は配列末尾(isLast)で消す。kind が goal 以外で終わっても余白を残さない。
  */
-export function RoadmapNode({ node }: { node: RoadmapNodeType }) {
-  const isLast = node.kind === "goal";
+export function RoadmapNode({
+  node,
+  isLast,
+}: {
+  node: RoadmapNodeType;
+  isLast: boolean;
+}) {
   return (
     <div className={`road-item relative pl-16 ${isLast ? "" : "pb-8"}`}>
       <div className="road-line absolute inset-0" />

@@ -21,13 +21,15 @@ export function MultiChoice({
   }
 
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid sm:grid-cols-2 gap-3" role="group">
       {choices.map((c) => {
         const selected = value.includes(c.value);
         return (
           <button
             key={c.value}
             type="button"
+            role="checkbox"
+            aria-checked={selected}
             onClick={() => toggle(c.value)}
             className={`text-left rounded-2xl border px-5 py-4 transition ${
               selected
@@ -37,6 +39,7 @@ export function MultiChoice({
           >
             <div className="flex items-center gap-3">
               <span
+                aria-hidden="true"
                 className={`w-4 h-4 rounded-md border-2 shrink-0 flex items-center justify-center ${
                   selected ? "border-violet bg-violet" : "border-mute"
                 }`}

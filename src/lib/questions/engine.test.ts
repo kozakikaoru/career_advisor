@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { QUESTION_SET } from "./index";
-import { getNextQuestionId, isComplete, getQuestion } from "./engine";
+import {
+  getNextQuestionId,
+  isComplete,
+  getQuestion,
+  getVisitedIds,
+  pruneAnswers,
+} from "./engine";
 import type { AnswerMap } from "@/lib/schema/answers";
 
 const set = QUESTION_SET;
@@ -147,6 +153,81 @@ describe("getNextQuestionId — goal_clarity 分岐", () => {
       risk_pref: "risk",
     };
     expect(walk(answers)).not.toContain("goal_direction");
+  });
+});
+
+describe("getVisitedIds / pruneAnswers — 放棄した分岐の回答を刈り取る(Med-1)", () => {
+  it("学生フローでは experience / income を訪問しない", () => {
+    const answers: AnswerMap = {
+      stage: "student",
+      field: "情報工学",
+      goal_clarity: "vague",
+      goal_direction: ["specialist"],
+    };
+    const visited = getVisitedIds(set, answers);
+    expect(visited.has("field")).toBe(true);
+    expect(visited.has("goal_clarity")).toBe(true);
+    expect(visited.has("experience")).toBe(false);
+    expect(visited.has("income")).toBe(false);
+  });
+
+  it("working→student に切替後、残存した experience/income を pruneAnswers が落とす", () => {
+    // working で experience/income まで答えた後、戻って student に変更したケース
+    const answers: AnswerMap = {
+      stage: "student",
+      field: "情報工学",
+      experience: "5to10", // 放棄した枝の残存
+      income: "500to700", // 放棄した枝の残存
+      goal_clarity: "vague",
+      goal_direction: ["specialist"],
+    };
+    const pruned = pruneAnswers(set, answers);
+    expect(pruned.experience).toBeUndefined();
+    expect(pruned.income).toBeUndefined();
+    expect(pruned.stage).toBe("student");
+    expect(pruned.field).toBe("情報工学");
+    expect(pruned.goal_clarity).toBe("vague");
+  });
+
+  it("goal_clarity clear→vague 切替後、放棄した goal_target を落とし goal_direction を残す", () => {
+    const answers: AnswerMap = {
+      stage: "working",
+      field: "営業",
+      experience: "3to5",
+      income: "300to500",
+      goal_clarity: "vague", // clear から変更
+      goal_target: "プロダクトマネージャー", // clear 時の残存(放棄枝)
+      goal_direction: ["management"],
+    };
+    const pruned = pruneAnswers(set, answers);
+    expect(pruned.goal_target).toBeUndefined();
+    expect(pruned.goal_direction).toEqual(["management"]);
+  });
+
+  it("整合した回答は何も落とさない(社会人×明確フロー)", () => {
+    const answers: AnswerMap = {
+      stage: "working",
+      field: "営業",
+      experience: "3to5",
+      income: "300to500",
+      goal_clarity: "clear",
+      goal_target: "マーケター",
+      goal_workstyle: "company",
+      goal_income: "600to800",
+      goal_horizon: "3y",
+      value_priority: "growth",
+      work_style_pref: "wide",
+      social_pref: "team",
+      risk_pref: "risk",
+    };
+    expect(pruneAnswers(set, answers)).toEqual(answers);
+  });
+
+  it("定義外のキーは訪問できないので pruneAnswers が落とす", () => {
+    const answers: AnswerMap = { stage: "working", field: "営業", __evil: "x" };
+    const pruned = pruneAnswers(set, answers);
+    expect(pruned.__evil).toBeUndefined();
+    expect(pruned.stage).toBe("working");
   });
 });
 

@@ -6,6 +6,7 @@ import {
   QUESTION_SET,
   getQuestion,
   getNextQuestionId,
+  pruneAnswers,
 } from "@/lib/questions";
 import type { AnswerMap, AnswerValue } from "@/lib/schema/answers";
 import { ConsentGate } from "./ConsentGate";
@@ -15,8 +16,9 @@ import { Logo } from "@/components/ui/Logo";
 import { Loading } from "@/components/Loading";
 
 const set = QUESTION_SET;
-// 進捗バーの分母(おおよその総質問数。分岐で前後する)
-const APPROX_TOTAL = 13;
+// 進捗バーの分母(おおよその総質問数。分岐で前後する)。
+// 最長フロー(社会人×目標明確 = 14問)でも分母を超えないよう 14 にする。
+const APPROX_TOTAL = 14;
 
 type Phase = "consent" | "asking" | "generating" | "error";
 
@@ -75,11 +77,14 @@ export function Wizard() {
       return;
     }
     setPhase("generating");
+    // 放棄した分岐の回答(例: working→student に切替後の experience/income)を除去し、
+    // 実際に辿った質問の回答のみを送信する(矛盾入力の防止)。
+    const cleanAnswers = pruneAnswers(set, answers);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers, consent: true }),
+        body: JSON.stringify({ answers: cleanAnswers, consent: true }),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as { id?: string };
@@ -115,7 +120,12 @@ export function Wizard() {
               <ProgressBar current={history.length + 1} total={APPROX_TOTAL} />
             </div>
 
-            <QuestionStep question={question} value={currentAnswer} onChange={setAnswer} />
+            <QuestionStep
+              question={question}
+              value={currentAnswer}
+              onChange={setAnswer}
+              onEnter={goNext}
+            />
 
             <div className="flex items-center justify-between mt-10 gap-3">
               <button

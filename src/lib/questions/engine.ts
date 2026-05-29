@@ -59,3 +59,34 @@ export function isComplete(
 ): boolean {
   return getNextQuestionId(set, currentId, answers) === null;
 }
+
+/**
+ * firstId から answers に沿って実際に辿れる質問ID集合を返す。
+ * 分岐(stage=student のスキップ等)で通らなくなった質問は含まれない。
+ * 無限ループはガード(訪問済みIDの再訪 / 上限回数)で防ぐ。
+ */
+export function getVisitedIds(set: QuestionSet, answers: AnswerMap): Set<string> {
+  const visited = new Set<string>();
+  let id: string | null = set.firstId;
+  // questions.length を上限に(余裕分 +1)。重複IDも検知して打ち切る。
+  const limit = set.questions.length + 1;
+  for (let i = 0; id && i < limit; i++) {
+    if (visited.has(id)) break; // 万一の循環ガード
+    visited.add(id);
+    id = getNextQuestionId(set, id, answers);
+  }
+  return visited;
+}
+
+/**
+ * 実際に辿った質問の回答のみを残し、放棄した分岐の回答を落とす。
+ * (例: working で答えた experience/income を student に切替後に除去)
+ */
+export function pruneAnswers(set: QuestionSet, answers: AnswerMap): AnswerMap {
+  const visited = getVisitedIds(set, answers);
+  const out: AnswerMap = {};
+  for (const id of Object.keys(answers)) {
+    if (visited.has(id)) out[id] = answers[id];
+  }
+  return out;
+}

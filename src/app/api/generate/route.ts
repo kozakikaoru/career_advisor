@@ -57,12 +57,17 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (e) {
-    const kind = e instanceof Error ? e.message : "unknown";
-    // 本文は残さず、エラー種別と所要時間のみ
-    console.error(`[generate] failed ms=${Date.now() - startedAt} kind=${kind}`);
+    // 保存失敗とAI失敗をざっくり分ける(分類用にメッセージは参照するが「ログには出さない」)。
+    const message = e instanceof Error ? e.message : "";
+    const isSave = /save|insert|sqlite|neon|database/i.test(message);
 
-    // 保存失敗とAI失敗をざっくり分ける
-    const isSave = /save|insert|sqlite|neon|database/i.test(kind);
+    // ログには回答本文が混入しないよう、e.name と固定の分類文字列のみを残す。
+    const errName = e instanceof Error ? e.name : "Unknown";
+    const category = isSave ? "save" : "generation";
+    console.error(
+      `[generate] failed ms=${Date.now() - startedAt} name=${errName} category=${category}`,
+    );
+
     return NextResponse.json(
       { error: isSave ? "save_failed" : "generation_failed" },
       { status: isSave ? 500 : 502 },
