@@ -31,9 +31,15 @@ export function ConsentGate({ onConsent }: { onConsent: () => void }) {
       </div>
 
       <label className="flex items-start gap-3 cursor-pointer mb-7 select-none">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => setChecked(e.target.checked)}
+          className="peer sr-only"
+        />
         <span
           aria-hidden="true"
-          className={`mt-0.5 w-6 h-6 rounded-md border-2 shrink-0 flex items-center justify-center transition ${
+          className={`mt-0.5 w-6 h-6 rounded-md border-2 shrink-0 flex items-center justify-center transition peer-focus-visible:ring-2 peer-focus-visible:ring-cyan peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg peer-focus-visible:border-cyan ${
             checked ? "border-cyan bg-cyan" : "border-mute"
           }`}
         >
@@ -52,12 +58,6 @@ export function ConsentGate({ onConsent }: { onConsent: () => void }) {
             </svg>
           )}
         </span>
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => setChecked(e.target.checked)}
-          className="sr-only"
-        />
         <span className="text-sm leading-relaxed">
           <Link href="/legal/terms" className="text-cyan underline hover:text-pink" target="_blank">
             利用規約

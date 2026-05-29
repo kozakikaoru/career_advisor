@@ -13,13 +13,15 @@ export function SingleChoice({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" role="radiogroup">
       {choices.map((c) => {
         const selected = value === c.value;
         return (
           <button
             key={c.value}
             type="button"
+            role="radio"
+            aria-checked={selected}
             onClick={() => onChange(c.value)}
             className={`w-full text-left rounded-2xl border px-5 py-4 transition ${
               selected
@@ -29,6 +31,7 @@ export function SingleChoice({
           >
             <div className="flex items-center gap-3">
               <span
+                aria-hidden="true"
                 className={`w-4 h-4 rounded-full border-2 shrink-0 ${
                   selected ? "border-cyan bg-cyan" : "border-mute"
                 }`}

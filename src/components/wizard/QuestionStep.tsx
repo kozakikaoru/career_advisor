@@ -12,10 +12,12 @@ export function QuestionStep({
   question,
   value,
   onChange,
+  onEnter,
 }: {
   question: Question;
   value: AnswerValue | undefined;
   onChange: (value: AnswerValue) => void;
+  onEnter?: () => void;
 }) {
   const axisLabel = AXIS_LABEL[question.axis];
   return (
@@ -50,6 +52,7 @@ export function QuestionStep({
           value={typeof value === "string" ? value : ""}
           placeholder={question.placeholder}
           onChange={onChange}
+          onEnter={onEnter}
         />
       )}
       {question.type === "textarea" && (
