@@ -34,12 +34,3 @@ export function LegalLayout({
     </>
   );
 }
-
-/** 後で差し込むことを示すプレースホルダ枠 */
-export function Placeholder({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-line bg-panel/40 px-5 py-4 text-mute/80">
-      {children}
-    </div>
-  );
-}
