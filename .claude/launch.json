@@ -18,6 +18,12 @@
       "runtimeExecutable": "/usr/local/opt/node/bin/node",
       "runtimeArgs": ["./node_modules/next/dist/bin/next", "start", "--port", "3300"],
       "port": 3300
+    },
+    {
+      "name": "career-advisor-3301",
+      "runtimeExecutable": "/usr/local/opt/node/bin/node",
+      "runtimeArgs": ["./node_modules/next/dist/bin/next", "start", "--port", "3301"],
+      "port": 3301
     }
   ]
 }
