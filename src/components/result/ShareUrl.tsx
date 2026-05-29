@@ -30,7 +30,7 @@ export function ShareUrl({ url }: { url: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex-1 sm:w-64 flex items-center gap-2 border border-line bg-panel2/60 rounded-lg px-3 py-3 text-xs text-mute">
+          <div className="flex-1 min-w-0 sm:w-64 flex items-center gap-2 border border-line bg-panel2/60 rounded-lg px-3 py-3 text-xs text-mute">
             <svg
               width="14"
               height="14"

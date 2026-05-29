@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   QUESTION_SET,
@@ -30,6 +30,12 @@ export function Wizard() {
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [currentId, setCurrentId] = useState<string>(set.firstId);
   const [history, setHistory] = useState<string[]>([]);
+
+  // 質問遷移・フェーズ遷移のたびにページトップへスクロール
+  // (前の質問のスクロール位置が引き継がれて気持ち悪いのを防ぐ)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentId, phase]);
 
   const question = getQuestion(set, currentId);
 
@@ -173,6 +179,10 @@ export function Wizard() {
                 この質問は任意です。空のまま進めます。
               </p>
             )}
+
+            {/* iOS Safari でツールバーが消えた状態でも「次へ」ボタンが画面下端に来ず、
+                1回タップで反応するよう、ボタン下に余白(次へボタン約2個分)を確保する。 */}
+            <div aria-hidden="true" className="h-24" />
           </div>
         )}
 
