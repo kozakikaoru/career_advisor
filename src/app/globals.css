@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * デザイン: design/mockups/result-dark.html をベースに移植。
+ * スタイリッシュ&ダーク: 濃紺〜黒 + シアン→バイオレット→ピンクのネオングラデ。
+ * Tailwind v4 は CSS-first 設定なので、モックの tailwind.config の色・フォントは
+ * ここの @theme に定義する(bg/panel/panel2/line/ice/mute/cyan/violet/pink/lime)。
+ */
+@theme {
+  --color-bg: #070912;
+  --color-panel: #0e1222;
+  --color-panel2: #141a30;
+  --color-line: #222a45;
+  --color-ice: #e7ecff;
+  --color-mute: #8a93b8;
+  --color-cyan: #22d3ee;
+  --color-violet: #a855f7;
+  --color-pink: #f472b6;
+  --color-lime: #a3e635;
+
+  --font-display: var(--font-space-grotesk), var(--font-noto-sans-jp), sans-serif;
+  --font-sans: var(--font-noto-sans-jp), sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  scroll-behavior: smooth;
+}
+body {
+  -webkit-font-smoothing: antialiased;
+  background: var(--color-bg);
+  color: var(--color-ice);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* neon gradient text */
+.neon-text {
+  background: linear-gradient(100deg, #22d3ee, #a855f7 55%, #f472b6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* glowing border card */
+.glow-card {
+  background: linear-gradient(180deg, rgba(20, 26, 48, 0.9), rgba(14, 18, 34, 0.9));
+  border: 1px solid rgba(34, 42, 69, 0.9);
+  box-shadow:
+    0 20px 60px -30px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.glow-ring {
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.25),
+    0 0 30px -6px rgba(34, 211, 238, 0.5);
+}
+
+/* roadmap connector */
+.road-line::before {
+  content: "";
+  position: absolute;
+  left: 23px;
+  top: 48px;
+  bottom: -26px;
+  width: 2px;
+  border-radius: 99px;
+  background: linear-gradient(to bottom, rgba(168, 85, 247, 0.7), rgba(34, 211, 238, 0.15));
+}
+.road-item:last-child .road-line::before {
+  display: none;
+}
+.node-glow {
+  box-shadow: 0 0 22px -4px var(--g, rgba(34, 211, 238, 0.7));
+}
+
+.rise {
+  animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.grid-bg {
+  background-image:
+    radial-gradient(60% 50% at 50% 0%, rgba(168, 85, 247, 0.18), transparent 70%),
+    radial-gradient(40% 40% at 85% 20%, rgba(34, 211, 238, 0.14), transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: auto, auto, 44px 44px, 44px 44px;
+}
+
+.bar {
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+}
+.bar2 {
+  background: linear-gradient(90deg, #a855f7, #f472b6);
+}
+.bar3 {
+  background: linear-gradient(90deg, #f472b6, #22d3ee);
 }
