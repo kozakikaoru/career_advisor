@@ -32,10 +32,10 @@ export function ConsentGate({ onConsent }: { onConsent: () => void }) {
 
       <label className="flex items-start gap-3 cursor-pointer mb-7 select-none">
         <span
+          aria-hidden="true"
           className={`mt-0.5 w-6 h-6 rounded-md border-2 shrink-0 flex items-center justify-center transition ${
             checked ? "border-cyan bg-cyan" : "border-mute"
           }`}
-          onClick={() => setChecked((v) => !v)}
         >
           {checked && (
             <svg
