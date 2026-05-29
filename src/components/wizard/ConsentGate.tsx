@@ -1,11 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 
 /** 開始前の同意ゲート。チェックを入れないと「同意して始める」を押せない(security 要件)。 */
 export function ConsentGate({ onConsent }: { onConsent: () => void }) {
   const [checked, setChecked] = useState(false);
+
+  // iOS Safari の <label>→内包 <input type="checkbox"> のクリック委譲は、
+  // 端末/バージョン/レイアウトの組合せで不安定に発火しないことがある(過去の修正で
+  // input をその場配置にしても再発)。さらに label 内に target="_blank" の <Link> が
+  // あると、Safari がそのアンカーをタップ対象とみなして委譲が抑制されるケースがある。
+  //
+  // 解決: <label>/<input> 構造を捨て、ラッパー <div> 自身を role="checkbox" な
+  // クリッカブル要素にして React state を直接トグルする。これで label 委譲問題に
+  // 依存しない。内部の <Link>(規約/PP)には stopPropagation を付けて、リンクを
+  // タップしてもチェック状態が変わらないようにする(規約を読みたいだけのユーザー保護)。
+  function toggle() {
+    setChecked((v) => !v);
+  }
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      toggle();
+    }
+  }
 
   return (
     <div className="glow-card rounded-3xl p-7 sm:p-10 rise">
@@ -30,16 +49,23 @@ export function ConsentGate({ onConsent }: { onConsent: () => void }) {
         </p>
       </div>
 
-      <label className="flex items-start gap-3 cursor-pointer mb-7 select-none">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => setChecked(e.target.checked)}
-          className="peer sr-only"
-        />
+      {/*
+        role="checkbox" の div をクリッカブルに。label/input には依存しない。
+        - 装飾 span は pointer-events-none(タップは必ずラッパーに当たる)
+        - 内部の <Link> は stopPropagation でラッパーの onClick を発火させない
+        - Space/Enter キーでもトグル(キーボードA11y)
+      */}
+      <div
+        role="checkbox"
+        aria-checked={checked}
+        tabIndex={0}
+        onClick={toggle}
+        onKeyDown={onKeyDown}
+        className="flex items-start gap-3 cursor-pointer mb-7 select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+      >
         <span
           aria-hidden="true"
-          className={`mt-0.5 w-6 h-6 rounded-md border-2 shrink-0 flex items-center justify-center transition peer-focus-visible:ring-2 peer-focus-visible:ring-cyan peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg peer-focus-visible:border-cyan ${
+          className={`mt-0.5 w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition pointer-events-none ${
             checked ? "border-cyan bg-cyan" : "border-mute"
           }`}
         >
@@ -59,16 +85,26 @@ export function ConsentGate({ onConsent }: { onConsent: () => void }) {
           )}
         </span>
         <span className="text-sm leading-relaxed">
-          <Link href="/legal/terms" className="text-cyan underline hover:text-pink" target="_blank">
+          <Link
+            href="/legal/terms"
+            className="text-cyan underline hover:text-pink"
+            target="_blank"
+            onClick={(e) => e.stopPropagation()}
+          >
             利用規約
           </Link>
           ・
-          <Link href="/legal/privacy" className="text-cyan underline hover:text-pink" target="_blank">
+          <Link
+            href="/legal/privacy"
+            className="text-cyan underline hover:text-pink"
+            target="_blank"
+            onClick={(e) => e.stopPropagation()}
+          >
             プライバシーポリシー
           </Link>
           に同意し、上記の注意事項を理解しました。
         </span>
-      </label>
+      </div>
 
       <button
         type="button"
