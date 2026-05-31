@@ -6,6 +6,7 @@ import {
   QUESTION_SET,
   getQuestion,
   getNextQuestionId,
+  getProgress,
   pruneAnswers,
 } from "@/lib/questions";
 import type { AnswerMap, AnswerValue } from "@/lib/schema/answers";
@@ -16,9 +17,6 @@ import { Logo } from "@/components/ui/Logo";
 import { Loading } from "@/components/Loading";
 
 const set = QUESTION_SET;
-// 進捗バーの分母(おおよその総質問数。分岐で前後する)。
-// 最長フロー(社会人×目標明確 = 14問)でも分母を超えないよう 14 にする。
-const APPROX_TOTAL = 14;
 
 type Phase = "consent" | "asking" | "generating" | "error";
 
@@ -39,25 +37,91 @@ export function Wizard() {
 
   const question = getQuestion(set, currentId);
 
-  function setAnswer(value: AnswerValue) {
-    setAnswers((prev) => ({ ...prev, [currentId]: value }));
+  function setAnswer(value: AnswerValue | undefined) {
+    // value=undefined は「未入力に戻す」=該当 ID を answers から削除する。
+    // number 型で入力が空欄/不正に戻った場合に使う。
+    setAnswers((prev) => {
+      if (value === undefined) {
+        if (!(currentId in prev)) return prev;
+        const { [currentId]: _drop, ...rest } = prev;
+        void _drop;
+        return rest;
+      }
+      return { ...prev, [currentId]: value };
+    });
   }
 
   const currentAnswer = answers[currentId];
 
   // 入力済みか(必須質問は値が必要。任意は空でも可)
-  const answered =
-    !question?.required ||
-    (Array.isArray(currentAnswer)
-      ? currentAnswer.length > 0
-      : typeof currentAnswer === "string" && currentAnswer.trim() !== "");
+  // - multi: 1個以上必須(specs v2 §8-2)
+  // - number: 整数で範囲内であることを NumberInput 側がコミット済みであることが必要
+  // - text/textarea: 空白でない文字列が必要
+  const answered = (() => {
+    if (!question) return false;
+    if (!question.required) return true;
+    if (question.type === "multi") {
+      return Array.isArray(currentAnswer) && currentAnswer.length > 0;
+    }
+    if (question.type === "number") {
+      if (typeof currentAnswer !== "number" || !Number.isInteger(currentAnswer)) {
+        return false;
+      }
+      if (
+        question.numberMin !== undefined &&
+        currentAnswer < question.numberMin
+      ) {
+        return false;
+      }
+      if (
+        question.numberMax !== undefined &&
+        currentAnswer > question.numberMax
+      ) {
+        return false;
+      }
+      return true;
+    }
+    // single / text / textarea
+    return typeof currentAnswer === "string" && currentAnswer.trim() !== "";
+  })();
 
   const nextId = question ? getNextQuestionId(set, currentId, answers) : null;
   const isLast = nextId === null;
 
+  // 進捗バー用スナップショット(セクション化・案C)
+  const snapshot = question
+    ? getProgress(set, currentId, answers, history)
+    : null;
+
   function goNext() {
     if (!answered) return;
     if (isLast) {
+      void submit();
+      return;
+    }
+    if (nextId) {
+      setHistory((h) => [...h, currentId]);
+      setCurrentId(nextId);
+    }
+  }
+
+  /**
+   * MAY(任意)質問をスキップして次へ進む。
+   * - 現在地の回答を削除(放棄として扱う)
+   * - 履歴は積む(戻れる)
+   * - 次が無ければ submit
+   */
+  function goSkip() {
+    if (!question || question.required) return;
+    // 現在地の回答を消す(空欄での通過 = 未指定として扱う)
+    setAnswers((prev) => {
+      if (!(currentId in prev)) return prev;
+      const { [currentId]: _drop, ...rest } = prev;
+      void _drop;
+      return rest;
+    });
+    if (isLast) {
+      // ラスト MAY (free_note 等) を空でスキップ = そのまま生成へ
       void submit();
       return;
     }
@@ -101,6 +165,9 @@ export function Wizard() {
     }
   }
 
+  // 必須でない質問では「スキップ」ボタンを表示する
+  const showSkip = phase === "asking" && question && !question.required;
+
   // ----- 描画 -----
   return (
     <>
@@ -120,10 +187,10 @@ export function Wizard() {
           />
         )}
 
-        {phase === "asking" && question && (
+        {phase === "asking" && question && snapshot && (
           <div>
             <div className="mb-9">
-              <ProgressBar current={history.length + 1} total={APPROX_TOTAL} />
+              <ProgressBar snapshot={snapshot} />
             </div>
 
             <QuestionStep
@@ -174,10 +241,25 @@ export function Wizard() {
               </button>
             </div>
 
-            {!question.required && (
-              <p className="text-xs text-mute/60 mt-4 text-center">
-                この質問は任意です。空のまま進めます。
-              </p>
+            {/*
+              MAY(required:false)質問の補助:
+              - 「スキップして次へ」ボタンを「次へ」の下に薄く配置(見落とされず、かつ目立ちすぎない)。
+              - 自由記述(textarea/text)で空欄のまま通過したいユーザーにも有効。
+              - 現在地の回答を破棄してから次へ進めるので、戻った時に空欄として再表示される。
+            */}
+            {showSkip && (
+              <div className="mt-4 flex flex-col items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={goSkip}
+                  className="text-xs text-mute hover:text-ice transition underline underline-offset-4 decoration-dotted"
+                >
+                  この質問はスキップして次へ →
+                </button>
+                <p className="text-[0.65rem] text-mute/60">
+                  この質問は任意です。答えなくても結果を生成できます。
+                </p>
+              </div>
             )}
 
             {/* iOS Safari でツールバーが消えた状態でも「次へ」ボタンが画面下端に来ず、
