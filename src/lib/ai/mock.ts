@@ -19,9 +19,11 @@ export class MockProvider implements AIProvider {
     const stageLabel = STAGE_LABEL[stageValue] ?? "あなた";
     const fieldLabel = pickFieldLabel(answers) || "今の分野";
 
-    const goalTarget = strOf(answers.goal_target);
+    // GOAL v2: goal_target は撤去された。代わりに other_field_text(学生のその他派生) /
+    //          student_goal_advance / chg_target_field / step_up_target 等から
+    //          「目標ラベル」を組み立てる。
     const currentLabel = goalLabelFromField(fieldLabel, stageLabel);
-    const goalLabel = goalTarget || directionGoalLabel(answers);
+    const goalLabel = pickGoalLabel(answers);
     const { durationText, roadmap } = buildRoadmap(answers, currentLabel, goalLabel);
 
     const plan: CareerPlan = {
@@ -154,24 +156,115 @@ const KNOWLEDGE_LABEL: Record<string, string> = {
   language: "語学",
 };
 
-function directionGoalLabel(answers: AnswerMap): string {
-  const dir = answers.goal_direction;
-  const map: Record<string, string> = {
-    specialist: "専門性を極めたプロ",
-    management: "チームを率いるリーダー",
-    independent: "自立したフリーランス",
-    stable: "安定したキャリア",
-    social: "社会に貢献する仕事",
-    creative: "ものづくりの担い手",
-  };
-  if (Array.isArray(dir) && dir.length > 0) {
-    const head = dir[0];
-    if (typeof head === "string") {
-      return clamp(map[head] ?? "理想のキャリア", 40);
-    }
+/**
+ * GOAL v2 ペルソナ別の「目標ラベル」を組み立てる。
+ * 優先順位:
+ *  1) 学生 / advance: student_goal_advance(自由記述)
+ *  2) 学生 / job + other_field: other_field_text(自由記述)
+ *  3) 学生 / job: student_goal_industry の先頭ラベル
+ *  4) 系統 A / continue: step_up_target ラベル
+ *  5) 系統 A / change → career_change: chg_target_field の先頭ラベル
+ *  6) 系統 B / new_entry_direction: 先頭ラベル
+ *  7) 系統 B / second_career_intent: ラベル
+ *  8) goal_freenote(MAY): 自由記述
+ *  9) fallback: 「これから見つける理想の姿」
+ */
+function pickGoalLabel(answers: AnswerMap): string {
+  // 1) 学生 / advance
+  const advance = strOf(answers.student_goal_advance);
+  if (advance) return clamp(`進学先候補: ${advance}`, 40);
+
+  // 2) 学生 / job + other_field 派生
+  const otherText = strOf(answers.other_field_text);
+  if (otherText) return clamp(otherText, 40);
+
+  // 3) 学生 / job: student_goal_industry 先頭ラベル
+  const sgi = answers.student_goal_industry;
+  if (Array.isArray(sgi)) {
+    const first = sgi.find(
+      (v): v is string =>
+        typeof v === "string" && v !== "undecided" && v !== "other_field",
+    );
+    if (first) return clamp(`目指す業界: ${INDUSTRY_LABEL[first] ?? first}`, 40);
   }
+
+  // 4) 系統 A / continue: step_up_target
+  const stu = strOf(answers.step_up_target);
+  if (stu) {
+    const map: Record<string, string> = {
+      specialist: "専門性を深めたプロ",
+      management: "チームを率いるマネージャー",
+      independent_same: "同分野で独立する道",
+      better_conditions: "同分野で待遇改善",
+    };
+    return clamp(map[stu] ?? "今の分野で次のステップ", 40);
+  }
+
+  // 5) 系統 A / change → career_change
+  const chg = answers.chg_target_field;
+  if (Array.isArray(chg)) {
+    const first = chg.find(
+      (v): v is string =>
+        typeof v === "string" &&
+        v !== "undecided" &&
+        v !== "other_chg",
+    );
+    if (first) return clamp(`新しい挑戦: ${INDUSTRY_LABEL[first] ?? first}`, 40);
+  }
+
+  // 6) 系統 B / new_entry_direction
+  const ned = answers.new_entry_direction;
+  if (Array.isArray(ned)) {
+    const first = ned.find(
+      (v): v is string =>
+        typeof v === "string" &&
+        v !== "undecided" &&
+        v !== "other_new",
+    );
+    if (first) return clamp(`これから働く分野: ${INDUSTRY_LABEL[first] ?? first}`, 40);
+  }
+
+  // 7) 系統 B / second_career_intent
+  const sci = strOf(answers.second_career_intent);
+  if (sci) {
+    const map: Record<string, string> = {
+      re_employment: "セカンドキャリア(再就職)",
+      independent: "セカンドキャリア(独立・顧問)",
+      community: "セカンドキャリア(地域貢献)",
+      retire_hobby: "セカンドキャリア(趣味中心)",
+      undecided: "これから見つけるセカンドキャリア",
+    };
+    return clamp(map[sci] ?? "これからの活動", 40);
+  }
+
+  // 8) goal_freenote(任意の自由記述)
+  const fn = strOf(answers.goal_freenote);
+  if (fn) return clamp(fn, 40);
+
   return "これから見つける理想の姿";
 }
+
+const INDUSTRY_LABEL: Record<string, string> = {
+  it_web: "IT・Web",
+  software_dev: "ソフトウェア開発",
+  data_ai: "データ・AI",
+  design_creative: "デザイン",
+  medical_care: "医療・看護・介護",
+  education: "教育・保育",
+  law_admin: "法律・行政",
+  finance_acc: "金融・会計",
+  manufacturing: "製造業",
+  construction: "建築・土木",
+  service: "サービス",
+  sales_retail: "営業・販売",
+  marketing_pr: "マーケティング",
+  hr_org: "人事",
+  research: "研究",
+  media: "メディア",
+  art_music: "芸術",
+  agri_fish: "農林水産",
+  language: "語学",
+};
 
 function horizonInfo(answers: AnswerMap): {
   durationText: string;
@@ -196,6 +289,18 @@ function horizonInfo(answers: AnswerMap): {
           { timeLabel: "6M", periodText: "半年後" },
           { timeLabel: "2Y", periodText: "2年後" },
           { timeLabel: "4Y", periodText: "4年後" },
+          { timeLabel: "GOAL", periodText: "目標" },
+        ],
+      };
+    // GOAL v2: 10y(長期キャリア視野)を新規追加
+    case "10y":
+      return {
+        durationText: "約10年",
+        steps: [
+          { timeLabel: "NOW", periodText: "今すぐ" },
+          { timeLabel: "1Y", periodText: "1年後" },
+          { timeLabel: "3Y", periodText: "3年後" },
+          { timeLabel: "7Y", periodText: "7年後" },
           { timeLabel: "GOAL", periodText: "目標" },
         ],
       };

@@ -12,11 +12,12 @@ import { AnswerMapSchema } from "./answers";
  */
 
 describe("AnswerMapSchema — 基本動作", () => {
-  it("代表的な employed フルパスは通る", () => {
+  it("代表的な employed フルパス(GOAL v2.2)は通る", () => {
     const res = AnswerMapSchema.safeParse({
       age: 28,
       stage: "employed",
       employment_type: "fulltime",
+      current_job_field: "Web エンジニア(バックエンド)",
       years_employed: "3to5",
       knowledge_fields: ["software_dev", "it_web", "data_ai"],
       current_income: "500to700",
@@ -24,11 +25,15 @@ describe("AnswerMapSchema — 基本動作", () => {
       life_constraint: ["none"],
       location: "metro",
       time_available: "1to3h",
-      goal_clarity: "clear",
-      goal_target: "PM",
-      goal_workstyle: "remote",
-      goal_income: "600to800",
+      // GOAL v2 系統 A: change_intent=continue → step_up_target
+      change_intent: "continue",
+      step_up_target: "specialist",
+      // v2.2: goal_workstyle が multi 化(配列)/ goal_avoid は撤去
+      goal_workstyle: ["same_as_now"],
+      goal_income: "800to1200",
       goal_horizon: "3y",
+      goal_start_timing: "now",
+      goal_commit: "20to50",
       value_priority: "growth",
       work_style_pref: "deep",
       social_pref: "team",
@@ -55,6 +60,18 @@ describe("AnswerMapSchema — 基本動作", () => {
     ).toBe(false);
   });
 
+  it("v1 GOAL 旧 ID(goal_clarity / goal_target / goal_direction)は撤廃済みなので弾かれる(回帰防止)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_clarity: "clear" }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ goal_target: "PM" }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ goal_direction: ["specialist"] }).success,
+    ).toBe(false);
+  });
+
   it("single で未定義の選択値は弾く", () => {
     const res = AnswerMapSchema.safeParse({ stage: "not_a_real_value" });
     expect(res.success).toBe(false);
@@ -65,8 +82,8 @@ describe("AnswerMapSchema — 基本動作", () => {
     expect(res.success).toBe(false);
   });
 
-  it("multi に文字列を渡すと弾く(型不一致)", () => {
-    const res = AnswerMapSchema.safeParse({ goal_direction: "specialist" });
+  it("multi に文字列を渡すと弾く(型不一致・v2.2: goal_workstyle が multi 化)", () => {
+    const res = AnswerMapSchema.safeParse({ goal_workstyle: "company" });
     expect(res.success).toBe(false);
   });
 
@@ -74,6 +91,7 @@ describe("AnswerMapSchema — 基本動作", () => {
     const res = AnswerMapSchema.safeParse({
       student_major: "情報科学",
       origin_freenote: "復職タイミングを模索中",
+      goal_freenote: "プログラミングを独学中",
       free_note: "改行や記号も含む 自由な文章 !?#",
     });
     expect(res.success).toBe(true);
@@ -477,8 +495,8 @@ describe("AnswerMapSchema — current_job_field(MUST/text・v2.1 新規)", () =>
   });
 });
 
-describe("AnswerMapSchema — v2.1 ペルソナ別フルパス", () => {
-  it("housekeeper + prior_work_exp=yes のフルパスは通る", () => {
+describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () => {
+  it("housekeeper + prior_work_exp=yes のフルパス(系統 A career_change)は通る", () => {
     const res = AnswerMapSchema.safeParse({
       age: 36,
       stage: "housekeeper",
@@ -491,11 +509,16 @@ describe("AnswerMapSchema — v2.1 ペルソナ別フルパス", () => {
       life_constraint: ["caring_kids"],
       location: "regional_city",
       time_available: "weekend",
-      goal_clarity: "vague",
-      goal_direction: ["stable"],
-      goal_workstyle: "remote",
+      // GOAL v2: 系統 A
+      change_intent: "change",
+      change_direction: "career_change",
+      chg_target_field: ["it_web", "design_creative"],
+      // v2.2: multi 化
+      goal_workstyle: ["freelance"],
       goal_income: "400to600",
       goal_horizon: "3y",
+      goal_start_timing: "within_1y",
+      goal_commit: "20to50",
       value_priority: "stability",
       work_style_pref: "deep",
       social_pref: "team",
@@ -504,7 +527,7 @@ describe("AnswerMapSchema — v2.1 ペルソナ別フルパス", () => {
     expect(res.success).toBe(true);
   });
 
-  it("housekeeper + prior_work_exp=no のフルパス(current_job_field / years_employed なし)は通る", () => {
+  it("housekeeper + prior_work_exp=no のフルパス(系統 B new_entry_direction)は通る", () => {
     const res = AnswerMapSchema.safeParse({
       age: 42,
       stage: "housekeeper",
@@ -515,11 +538,14 @@ describe("AnswerMapSchema — v2.1 ペルソナ別フルパス", () => {
       life_constraint: ["caring_kids"],
       location: "rural",
       time_available: "lt1h",
-      goal_clarity: "none",
-      goal_direction: ["social"],
-      goal_workstyle: "wlb",
-      goal_income: "no_answer",
+      // GOAL v2: 系統 B (new_entry_direction)
+      new_entry_direction: ["it_web", "design_creative", "undecided"],
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["freelance"],
+      goal_income: "same_as_now",
       goal_horizon: "open",
+      goal_start_timing: "slow",
+      goal_commit: "none",
       value_priority: "meaning",
       work_style_pref: "wide",
       social_pref: "team",
@@ -528,7 +554,7 @@ describe("AnswerMapSchema — v2.1 ペルソナ別フルパス", () => {
     expect(res.success).toBe(true);
   });
 
-  it("student で student_work_detail を含むフルパス(education なし)は通る", () => {
+  it("student/job + student_goal_industry のフルパスは通る(系統 B / 学生)", () => {
     const res = AnswerMapSchema.safeParse({
       age: 20,
       stage: "student",
@@ -543,16 +569,582 @@ describe("AnswerMapSchema — v2.1 ペルソナ別フルパス", () => {
       life_constraint: ["none"],
       location: "metro",
       time_available: "1to3h",
-      goal_clarity: "vague",
-      goal_direction: ["specialist"],
-      goal_workstyle: "company",
+      // GOAL v2: 学生
+      student_goal_track: "job",
+      student_goal_industry: ["marketing_pr", "it_web"],
+      // v2.2: multi 化
+      goal_workstyle: ["company"],
       goal_income: "400to600",
-      goal_horizon: "3y",
+      goal_horizon: "5y",
+      goal_start_timing: "now",
+      goal_commit: "lt5",
       value_priority: "growth",
       work_style_pref: "wide",
       social_pref: "team",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
+  });
+
+  it("student/job + other_field を含むフルパス(other_field_text 派生)は通る", () => {
+    const res = AnswerMapSchema.safeParse({
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "経済学部",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["marketing_pr"],
+      current_income: "none",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      student_goal_track: "job",
+      student_goal_industry: ["other_field", "marketing_pr"],
+      other_field_text: "eスポーツ業界の運営・大会企画",
+      // v2.2: multi 化
+      goal_workstyle: ["company"],
+      goal_income: "400to600",
+      goal_horizon: "5y",
+      goal_start_timing: "now",
+      goal_commit: "lt5",
+      value_priority: "growth",
+      work_style_pref: "wide",
+      social_pref: "team",
+      risk_pref: "safe",
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("(v2.1) student/job + student_job_status を含むフルパスは通る", () => {
+    const res = AnswerMapSchema.safeParse({
+      age: 22,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u4",
+      student_major: "情報",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["software_dev"],
+      current_income: "none",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      student_goal_track: "job",
+      student_job_status: "offer_accepted",
+      student_goal_industry: ["software_dev"],
+      // v2.2: multi 化
+      goal_workstyle: ["company"],
+      goal_income: "400to600",
+      goal_horizon: "5y",
+      goal_start_timing: "after_preparation",
+      goal_commit: "lt5",
+      value_priority: "growth",
+      work_style_pref: "deep",
+      social_pref: "team",
+      risk_pref: "safe",
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("(v2.1) student/advance + student_advance_status + student_goal_industry を含むフルパスは通る(admitted × after_preparation)", () => {
+    const res = AnswerMapSchema.safeParse({
+      age: 18,
+      stage: "student",
+      school_type: "high_school",
+      grade_hs: "hs3",
+      student_major: "理系",
+      student_work_exp: ["none"],
+      knowledge_fields: ["medical_care"],
+      current_income: "none",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      student_goal_track: "advance",
+      student_advance_status: "admitted",
+      student_goal_advance: "医学部",
+      student_goal_industry: ["medical_care"],
+      // v2.2: multi 化
+      goal_workstyle: ["company"],
+      goal_income: "600to800",
+      goal_horizon: "10y",
+      goal_start_timing: "after_preparation",
+      goal_commit: "100to300",
+      value_priority: "meaning",
+      work_style_pref: "deep",
+      social_pref: "team",
+      risk_pref: "safe",
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("retired/early のフルパス(系統 B second_career_intent)は通る", () => {
+    const res = AnswerMapSchema.safeParse({
+      age: 50,
+      stage: "retired",
+      retired_status: "early",
+      prior_work_exp: "yes",
+      current_job_field: "経理財務マネージャー",
+      years_employed: "gt10",
+      knowledge_fields: ["finance_acc"],
+      current_income: "700to1000",
+      education: "uni",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "flex",
+      // GOAL v2: 系統 B (second_career_intent)
+      second_career_intent: "re_employment",
+      // v2.2: multi 化
+      goal_workstyle: ["company"],
+      goal_income: "600to800",
+      goal_horizon: "5y",
+      goal_start_timing: "within_3m",
+      goal_commit: "lt5",
+      goal_freenote: "経理財務の知見を活かしたい",
+      value_priority: "meaning",
+      work_style_pref: "deep",
+      social_pref: "solo",
+      risk_pref: "safe",
+    });
+    expect(res.success).toBe(true);
+  });
+});
+
+// ============================================================
+// GOAL v2 専用ホワイトリスト検証(specs/goal-questions-v2.md §8-4)
+// ============================================================
+
+describe("AnswerMapSchema — change_intent (系統 A・3 択)", () => {
+  it.each(["continue", "change", "undecided"])("change_intent=%s は通る", (v) => {
+    expect(AnswerMapSchema.safeParse({ change_intent: v }).success).toBe(true);
+  });
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ change_intent: "maybe" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — change_direction (系統 A・3 択)", () => {
+  it.each(["step_up", "career_change", "both_unsure"])(
+    "change_direction=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ change_direction: v }).success).toBe(true);
+    },
+  );
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ change_direction: "career" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — step_up_target (系統 A・4 択)", () => {
+  it.each(["specialist", "management", "independent_same", "better_conditions"])(
+    "step_up_target=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ step_up_target: v }).success).toBe(true);
+    },
+  );
+
+  it("不正値(v1 残骸)は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ step_up_target: "independent" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — chg_target_field (multi 21 択)", () => {
+  it("代表的な選択肢が通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        chg_target_field: ["it_web", "software_dev", "undecided"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("空配列は弾く(multi MUST)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ chg_target_field: [] }).success,
+    ).toBe(false);
+  });
+
+  it("不正キーは弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ chg_target_field: ["bogus"] }).success,
+    ).toBe(false);
+  });
+
+  it("other_chg(その他キー)は通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({ chg_target_field: ["other_chg"] }).success,
+    ).toBe(true);
+  });
+});
+
+describe("AnswerMapSchema — student_goal_track (系統 B / 学生・4 択)", () => {
+  it.each(["job", "advance", "startup", "undecided"])(
+    "student_goal_track=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ student_goal_track: v }).success).toBe(true);
+    },
+  );
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ student_goal_track: "phd" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — student_goal_industry (multi 21 択)", () => {
+  it("代表的な選択肢が通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        student_goal_industry: ["marketing_pr", "it_web"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("other_field を含む配列が通る(派生で other_field_text を要求)", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        student_goal_industry: ["other_field", "marketing_pr"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("空配列は弾く(multi MUST)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ student_goal_industry: [] }).success,
+    ).toBe(false);
+  });
+
+  it("不正キーは弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ student_goal_industry: ["bogus"] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — other_field_text (派生 text MUST)", () => {
+  it("自由文字列を許可", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        other_field_text: "eスポーツ運営",
+      }).success,
+    ).toBe(true);
+  });
+
+  // text/textarea は型レベルでは空文字も許容される(Wizard 側で空欄チェック)
+  it("空文字は型としては許可される(MUST の空欄チェックは Wizard 側)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ other_field_text: "" }).success,
+    ).toBe(true);
+  });
+
+  it("長すぎる文字列は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        other_field_text: "あ".repeat(2001),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — student_goal_advance (text MUST)", () => {
+  it("自由文字列を許可", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        student_goal_advance: "大学院(情報科学)",
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("AnswerMapSchema — new_entry_direction (multi 21 択)", () => {
+  it("代表的な選択肢が通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        new_entry_direction: ["it_web", "design_creative", "undecided"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("空配列は弾く(multi MUST)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ new_entry_direction: [] }).success,
+    ).toBe(false);
+  });
+
+  it("other_new(その他)は通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({ new_entry_direction: ["other_new"] }).success,
+    ).toBe(true);
+  });
+});
+
+describe("AnswerMapSchema — second_career_intent (5 択)", () => {
+  it.each([
+    "re_employment",
+    "independent",
+    "community",
+    "retire_hobby",
+    "undecided",
+  ])("second_career_intent=%s は通る", (v) => {
+    expect(AnswerMapSchema.safeParse({ second_career_intent: v }).success).toBe(true);
+  });
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ second_career_intent: "retire" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — goal_workstyle (multi 7 択・v2.2 で multi 化・「雇用形態に純化」)", () => {
+  it.each([
+    "company",
+    "public",
+    "freelance",
+    "startup",
+    "multi_job",
+    "same_as_now",
+    "undecided",
+  ])("goal_workstyle=[%s] 単独選択は通る(v2.2: multi)", (v) => {
+    expect(AnswerMapSchema.safeParse({ goal_workstyle: [v] }).success).toBe(true);
+  });
+
+  it("複数選択(company + multi_job)は通る(v2.2 で multi 化)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_workstyle: ["company", "multi_job"] }).success,
+    ).toBe(true);
+  });
+
+  it("7 値すべて並べて選択(理論上のケース)も通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        goal_workstyle: [
+          "company",
+          "public",
+          "freelance",
+          "startup",
+          "multi_job",
+          "same_as_now",
+          "undecided",
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("空配列は弾く(v2.2: MUST multi = 1 個以上必須)", () => {
+    expect(AnswerMapSchema.safeParse({ goal_workstyle: [] }).success).toBe(false);
+  });
+
+  it("文字列(旧 single 時代の渡し方)は弾く(v2.2: multi 化で配列必須)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_workstyle: "company" }).success,
+    ).toBe(false);
+  });
+
+  it("不正キーは弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_workstyle: ["bogus"] }).success,
+    ).toBe(false);
+  });
+
+  it("v1 の remote / wlb は撤去済みなので弾かれる", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_workstyle: ["remote"] }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ goal_workstyle: ["wlb"] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — goal_income (9 択・no_answer 撤去)", () => {
+  it.each([
+    "same_as_now",
+    "lt200",
+    "200to300",
+    "300to400",
+    "400to600",
+    "600to800",
+    "800to1200",
+    "1200to2000",
+    "gt2000",
+  ])("goal_income=%s は通る", (v) => {
+    expect(AnswerMapSchema.safeParse({ goal_income: v }).success).toBe(true);
+  });
+
+  it("v1 の no_answer は撤去済みなので弾かれる", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_income: "no_answer" }).success,
+    ).toBe(false);
+  });
+
+  it("ドラフト時代の lt400 / gt1200 は撤去済み(細分化された)ので弾かれる", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_income: "lt400" }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ goal_income: "gt1200" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — goal_horizon (5 択・10y 追加)", () => {
+  it.each(["1y", "3y", "5y", "10y", "open"])("goal_horizon=%s は通る", (v) => {
+    expect(AnswerMapSchema.safeParse({ goal_horizon: v }).success).toBe(true);
+  });
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_horizon: "2y" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — goal_start_timing (5 択 / v2.1: after_preparation 追加)", () => {
+  it.each(["now", "within_3m", "within_1y", "after_preparation", "slow"])(
+    "goal_start_timing=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ goal_start_timing: v }).success).toBe(true);
+    },
+  );
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_start_timing: "ASAP" }).success,
+    ).toBe(false);
+  });
+
+  it("v2.1 で追加された after_preparation を受け入れる(v2 確定版から回帰がないか)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_start_timing: "after_preparation" })
+        .success,
+    ).toBe(true);
+  });
+});
+
+// ============================================================
+// GOAL v2.1 §8-10-3: 新規ホワイトリスト 3 ケース
+// ============================================================
+describe("AnswerMapSchema — student_job_status (v2.1 新規 / 7 択)", () => {
+  it.each([
+    "exploring",
+    "researching",
+    "entry_started",
+    "in_selection",
+    "offer_received",
+    "offer_accepted",
+    "not_started",
+  ])("student_job_status=%s は通る", (v) => {
+    expect(
+      AnswerMapSchema.safeParse({ student_job_status: v }).success,
+    ).toBe(true);
+  });
+
+  it("7 値以外は弾く", () => {
+    for (const v of ["done", "未着手", "started", "applied"]) {
+      expect(
+        AnswerMapSchema.safeParse({ student_job_status: v }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("AnswerMapSchema — student_advance_status (v2.1 新規 / 4 択・reconsidering 撤去)", () => {
+  it.each(["searching", "target_decided", "in_exam", "admitted"])(
+    "student_advance_status=%s は通る",
+    (v) => {
+      expect(
+        AnswerMapSchema.safeParse({ student_advance_status: v }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("§9-v2.1-2 採択 A: reconsidering(進学迷い)は撤去済みなので弾かれる", () => {
+    expect(
+      AnswerMapSchema.safeParse({ student_advance_status: "reconsidering" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("その他不正値は弾く", () => {
+    for (const v of ["undecided", "applied", "pass"]) {
+      expect(
+        AnswerMapSchema.safeParse({ student_advance_status: v }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("AnswerMapSchema — goal_avoid (v2.2 完全撤去・回帰防止)", () => {
+  // v2.2 でほぼ全員が全選択肢にチェック → 差別化情報として機能しなかったため完全撤去。
+  // 旧 ID `goal_avoid` を投げると 400(未定義 ID として弾く)。
+
+  it("goal_avoid: [\"long_hours\"] を送ると 400(撤去済み・未定義 ID)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_avoid: ["long_hours"] }).success,
+    ).toBe(false);
+  });
+
+  it("goal_avoid: [\"none_avoid\"](旧「特になし」)を送ると 400", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_avoid: ["none_avoid"] }).success,
+    ).toBe(false);
+  });
+
+  it("goal_avoid: [] を送ると 400(撤去済み・未定義 ID)", () => {
+    expect(AnswerMapSchema.safeParse({ goal_avoid: [] }).success).toBe(false);
+  });
+
+  it("goal_avoid: \"long_hours\"(文字列でも撤去済み)を送ると 400", () => {
+    expect(
+      AnswerMapSchema.safeParse({ goal_avoid: "long_hours" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — goal_commit (7 択・新規・中立表現)", () => {
+  it.each([
+    "none",
+    "lt5",
+    "5to20",
+    "20to50",
+    "50to100",
+    "100to300",
+    "gt300",
+  ])("goal_commit=%s は通る", (v) => {
+    expect(AnswerMapSchema.safeParse({ goal_commit: v }).success).toBe(true);
+  });
+
+  it("ドラフト時代の zero / lt10 / 10to50 / 50to300 は撤去済みなので弾かれる", () => {
+    for (const v of ["zero", "lt10", "10to50", "50to300"]) {
+      expect(
+        AnswerMapSchema.safeParse({ goal_commit: v }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("AnswerMapSchema — goal_freenote (MAY textarea)", () => {
+  it("自由文字列を許可", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        goal_freenote: "起業したいが具体プロダクトは未定",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("長すぎる文字列は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        goal_freenote: "あ".repeat(2001),
+      }).success,
+    ).toBe(false);
   });
 });

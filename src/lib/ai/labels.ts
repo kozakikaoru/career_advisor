@@ -6,18 +6,20 @@ import type { AnswerMap } from "@/lib/schema/answers";
  * これらは AI プロンプトに渡さない(項目自体を省略する)ことで、
  * 「答えない」「unsure」をそのままラベルとして AI に渡さない。
  *
- * v2 では ORIGIN から `no_answer` を全廃したため、ここで除外するのは
- * GOAL の `goal_income.no_answer` と ORIGIN の `time_available.unsure` のみ。
+ * v2 / GOAL v2 では「答えない」を全廃。残るのは:
+ * - ORIGIN の `time_available.unsure`(「分からない」相当)
+ *
+ * 注意: GOAL v2 の `undecided`(change_intent / change_direction.both_unsure 等)は
+ * 「迷い」という意味ある回答シグナルとして AI に渡す(skip しない)。
  */
-const SKIP_SINGLE_VALUES: ReadonlySet<string> = new Set([
-  "no_answer",
-  "unsure",
-]);
+const SKIP_SINGLE_VALUES: ReadonlySet<string> = new Set(["unsure"]);
 
 /**
  * multi の選択肢のうち「特になし」相当のキー。配列から取り除いた上で、
  * 結果が空配列ならその項目自体を省略する。
- * v2 では `none`(life_constraint / student_work_exp / knowledge_fields の `none_kn`)が対象。
+ * v2 では `none`(life_constraint / student_work_exp)/ `none_kn`(knowledge_fields)が対象。
+ *
+ * v2.2 で `goal_avoid` 自体を完全撤去したため、`none_avoid` への言及も削除済み。
  */
 const SKIP_MULTI_VALUES: ReadonlySet<string> = new Set(["none", "none_kn"]);
 
