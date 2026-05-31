@@ -26,8 +26,11 @@ function walk(answers: AnswerMap): string[] {
 
 /**
  * v2 ペルソナ別 answers ヘルパ。フルパス回答(MAY も適当に埋めるか省略可)。
- * - 基本部分は全員共通(knowledge_fields 以降 + GOAL + MINDSET)。
+ * - 基本部分は全員共通(knowledge_fields 以降 + GOAL v2 + MINDSET)。
  * - 立場ごとに追加質問(深掘り質問)を `branch` で差し込む。
+ *
+ * GOAL v2 では系統 A(現職持ち層)を仮定して change_intent=continue → step_up_target の
+ * 最短パスを採用(系統 A の最少問数 = 9 問・continue)。系統 B はテスト毎に上書きする。
  */
 function baseTail(): AnswerMap {
   return {
@@ -38,11 +41,15 @@ function baseTail(): AnswerMap {
     location: "metro",
     time_available: "1to3h",
     origin_freenote: "",
-    goal_clarity: "clear",
-    goal_target: "PM",
-    goal_workstyle: "company",
+    // GOAL v2 系統 A: continue → step_up_target → 共通フロー
+    change_intent: "continue",
+    step_up_target: "specialist",
+    // v2.2: goal_workstyle が multi 化 / goal_avoid は撤去
+    goal_workstyle: ["company"],
     goal_income: "600to800",
     goal_horizon: "3y",
+    goal_start_timing: "now",
+    goal_commit: "lt5",
     value_priority: "growth",
     work_style_pref: "deep",
     social_pref: "team",
@@ -346,16 +353,464 @@ describe("knowledge_fields branch — other_kn 派生", () => {
   });
 });
 
-describe("末尾の線形遷移(current_income → goal_clarity)", () => {
+describe("末尾の線形遷移(current_income → origin_freenote)", () => {
   it.each([
     ["current_income", "education"],
     ["education", "life_constraint"],
     ["life_constraint", "location"],
     ["location", "time_available"],
     ["time_available", "origin_freenote"],
-    ["origin_freenote", "goal_clarity"],
   ] as const)("%s → %s", (from, to) => {
     expect(getNextQuestionId(set, from, {})).toBe(to);
+  });
+
+  it("origin_freenote の next は GOAL v2 系統判定 branch(stage 未確定時は change_intent にフォールバック)", () => {
+    expect(getNextQuestionId(set, "origin_freenote", {})).toBe("change_intent");
+  });
+});
+
+// ============================================================
+// GOAL v2: origin_freenote.branch — 系統 A/B 判定(specs §8-1)
+// ============================================================
+describe("GOAL v2 origin_freenote.branch — 系統 A/B 判定", () => {
+  // 系統 A: 在職者・フリーター・フリーランス・求職中・育休・休職 などは change_intent へ
+  it.each([
+    ["employed"],
+    ["freeter"],
+    ["freelance"],
+    ["seeking"],
+    ["parental_leave"],
+    ["on_leave"],
+  ] as const)("stage=%s は系統 A(change_intent)へ", (stage) => {
+    expect(
+      getNextQuestionId(set, "origin_freenote", { stage }),
+    ).toBe("change_intent");
+  });
+
+  // 系統 B: 学生 → student_goal_track
+  it("stage=student は系統 B(student_goal_track)へ", () => {
+    expect(
+      getNextQuestionId(set, "origin_freenote", { stage: "student" }),
+    ).toBe("student_goal_track");
+  });
+
+  // 系統 B: 退職者 early / looking → second_career_intent
+  it.each(["early", "looking"] as const)(
+    "stage=retired + retired_status=%s は系統 B(second_career_intent)へ",
+    (rs) => {
+      expect(
+        getNextQuestionId(set, "origin_freenote", {
+          stage: "retired",
+          retired_status: rs,
+        }),
+      ).toBe("second_career_intent");
+    },
+  );
+
+  // 系統 A: 退職者 pre / re_employ → change_intent
+  it.each(["pre", "re_employ"] as const)(
+    "stage=retired + retired_status=%s は系統 A(change_intent)へ",
+    (rs) => {
+      expect(
+        getNextQuestionId(set, "origin_freenote", {
+          stage: "retired",
+          retired_status: rs,
+          prior_work_exp: "yes",
+        }),
+      ).toBe("change_intent");
+    },
+  );
+
+  // 系統 B: 主婦・主夫等 prior_work_exp=no → new_entry_direction
+  it.each([
+    "housekeeper",
+    "parental_leave",
+    "on_leave",
+    "other",
+  ] as const)(
+    "stage=%s + prior_work_exp=no は系統 B(new_entry_direction)へ",
+    (stage) => {
+      expect(
+        getNextQuestionId(set, "origin_freenote", {
+          stage,
+          prior_work_exp: "no",
+        }),
+      ).toBe("new_entry_direction");
+    },
+  );
+
+  // 系統 A: 主婦・主夫等 prior_work_exp=yes → change_intent
+  it.each([
+    "housekeeper",
+    "parental_leave",
+    "on_leave",
+    "other",
+  ] as const)(
+    "stage=%s + prior_work_exp=yes は系統 A(change_intent)へ",
+    (stage) => {
+      expect(
+        getNextQuestionId(set, "origin_freenote", {
+          stage,
+          prior_work_exp: "yes",
+        }),
+      ).toBe("change_intent");
+    },
+  );
+});
+
+// ============================================================
+// GOAL v2: change_intent.branch — continue / change / undecided
+// ============================================================
+describe("GOAL v2 change_intent.branch", () => {
+  it("continue → step_up_target に直行", () => {
+    expect(
+      getNextQuestionId(set, "change_intent", { change_intent: "continue" }),
+    ).toBe("step_up_target");
+  });
+
+  it("change → change_direction へ深掘り", () => {
+    expect(
+      getNextQuestionId(set, "change_intent", { change_intent: "change" }),
+    ).toBe("change_direction");
+  });
+
+  it("undecided → change_direction へ深掘り", () => {
+    expect(
+      getNextQuestionId(set, "change_intent", { change_intent: "undecided" }),
+    ).toBe("change_direction");
+  });
+});
+
+// ============================================================
+// GOAL v2: change_direction.branch
+// ============================================================
+describe("GOAL v2 change_direction.branch", () => {
+  it("step_up → step_up_target", () => {
+    expect(
+      getNextQuestionId(set, "change_direction", {
+        change_direction: "step_up",
+      }),
+    ).toBe("step_up_target");
+  });
+
+  it("career_change → chg_target_field", () => {
+    expect(
+      getNextQuestionId(set, "change_direction", {
+        change_direction: "career_change",
+      }),
+    ).toBe("chg_target_field");
+  });
+
+  it("both_unsure → goal_workstyle(共通フロー直行)", () => {
+    expect(
+      getNextQuestionId(set, "change_direction", {
+        change_direction: "both_unsure",
+      }),
+    ).toBe("goal_workstyle");
+  });
+});
+
+// ============================================================
+// GOAL v2.1: student_goal_track.branch(進捗ステータス経由に変更)
+// ============================================================
+describe("GOAL v2.1 student_goal_track.branch", () => {
+  it("job → student_job_status(v2.1 改修)", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_track", {
+        student_goal_track: "job",
+      }),
+    ).toBe("student_job_status");
+  });
+
+  it("advance → student_advance_status(v2.1 改修)", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_track", {
+        student_goal_track: "advance",
+      }),
+    ).toBe("student_advance_status");
+  });
+
+  it("startup → goal_workstyle(共通フロー直行)", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_track", {
+        student_goal_track: "startup",
+      }),
+    ).toBe("goal_workstyle");
+  });
+
+  it("undecided → goal_workstyle(共通フロー直行)", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_track", {
+        student_goal_track: "undecided",
+      }),
+    ).toBe("goal_workstyle");
+  });
+});
+
+// ============================================================
+// GOAL v2.1: student_job_status / student_advance_status 線形遷移
+// ============================================================
+describe("GOAL v2.1 学生進捗ステータスの線形遷移", () => {
+  it("student_job_status → student_goal_industry(7択どれを選んでも線形に進む)", () => {
+    for (const v of [
+      "exploring",
+      "researching",
+      "entry_started",
+      "in_selection",
+      "offer_received",
+      "offer_accepted",
+      "not_started",
+    ]) {
+      expect(
+        getNextQuestionId(set, "student_job_status", {
+          student_job_status: v,
+        }),
+      ).toBe("student_goal_industry");
+    }
+  });
+
+  it("student_advance_status → student_goal_advance(4択どれを選んでも線形に進む)", () => {
+    for (const v of ["searching", "target_decided", "in_exam", "admitted"]) {
+      expect(
+        getNextQuestionId(set, "student_advance_status", {
+          student_advance_status: v,
+        }),
+      ).toBe("student_goal_advance");
+    }
+  });
+
+  it("student_advance_status は 4 択(reconsidering 撤去)", () => {
+    const q = getQuestion(set, "student_advance_status");
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      ["searching", "target_decided", "in_exam", "admitted"].sort(),
+    );
+    // §9-v2.1-2 採択 A: reconsidering は撤去済み
+    expect(q?.choices?.some((c) => c.value === "reconsidering")).toBe(false);
+  });
+
+  it("student_job_status は 7 択", () => {
+    const q = getQuestion(set, "student_job_status");
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      [
+        "exploring",
+        "researching",
+        "entry_started",
+        "in_selection",
+        "offer_received",
+        "offer_accepted",
+        "not_started",
+      ].sort(),
+    );
+  });
+
+  it("student_goal_advance → student_goal_industry(v2.1 改修 / 進学者にも業界を聞く)", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_advance", {
+        student_goal_advance: "大学院(情報科学)",
+      }),
+    ).toBe("student_goal_industry");
+  });
+});
+
+// ============================================================
+// GOAL v2: student_goal_industry.branch — other_field 派生
+// ============================================================
+describe("GOAL v2 student_goal_industry.branch", () => {
+  it("other_field を含むと other_field_text へ派生", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_industry", {
+        student_goal_industry: ["marketing_pr", "other_field"],
+      }),
+    ).toBe("other_field_text");
+  });
+
+  it("other_field を含まないと goal_workstyle へ直行", () => {
+    expect(
+      getNextQuestionId(set, "student_goal_industry", {
+        student_goal_industry: ["marketing_pr", "it_web"],
+      }),
+    ).toBe("goal_workstyle");
+  });
+
+  it("other_field_text の次は goal_workstyle", () => {
+    expect(
+      getNextQuestionId(set, "other_field_text", {
+        other_field_text: "eスポーツ運営",
+      }),
+    ).toBe("goal_workstyle");
+  });
+});
+
+// ============================================================
+// GOAL v2: 共通フローの線形遷移
+// ============================================================
+describe("GOAL v2 共通フローの線形遷移", () => {
+  it.each([
+    ["step_up_target", "goal_workstyle"],
+    ["chg_target_field", "goal_workstyle"],
+    // v2.1 改修: student_goal_advance → student_goal_industry(進学者にも業界を聞く)
+    ["student_goal_advance", "student_goal_industry"],
+    ["new_entry_direction", "goal_workstyle"],
+    ["second_career_intent", "goal_workstyle"],
+    ["goal_workstyle", "goal_income"],
+    ["goal_income", "goal_horizon"],
+    ["goal_horizon", "goal_start_timing"],
+    // v2.2: goal_avoid 撤去 → goal_start_timing → goal_commit に直接接続
+    ["goal_start_timing", "goal_commit"],
+    ["goal_commit", "goal_freenote"],
+    // goal_freenote の次は MINDSET の value_priority
+    ["goal_freenote", "value_priority"],
+  ] as const)("%s → %s", (from, to) => {
+    expect(getNextQuestionId(set, from, {})).toBe(to);
+  });
+});
+
+// ============================================================
+// 回帰防止: v1 GOAL の旧 ID が一切残っていないこと
+// ============================================================
+describe("v1 GOAL 旧 ID 撤去確認(回帰防止)", () => {
+  it.each([
+    "goal_clarity",
+    "goal_target",
+    "goal_direction",
+  ])("旧 ID '%s' は定義に存在しない", (id) => {
+    expect(getQuestion(set, id), `still exists: ${id}`).toBeUndefined();
+  });
+
+  it("GOAL v2 / v2.1 で新規 ID が定義されている(v2.2: goal_avoid は撤去)", () => {
+    const newGoalIds = [
+      "change_intent",
+      "change_direction",
+      "step_up_target",
+      "chg_target_field",
+      "student_goal_track",
+      // v2.1 新規:
+      "student_job_status",
+      "student_advance_status",
+      "student_goal_industry",
+      "other_field_text",
+      "student_goal_advance",
+      "new_entry_direction",
+      "second_career_intent",
+      "goal_workstyle",
+      "goal_income",
+      "goal_horizon",
+      "goal_start_timing",
+      // v2.2: goal_avoid 撤去
+      "goal_commit",
+      "goal_freenote",
+    ];
+    for (const id of newGoalIds) {
+      expect(getQuestion(set, id), `missing: ${id}`).toBeDefined();
+    }
+  });
+
+  it("v2.2: goal_avoid は撤去済み(定義に存在しない)", () => {
+    expect(getQuestion(set, "goal_avoid"), "still exists: goal_avoid").toBeUndefined();
+  });
+
+  it("GOAL セクションは 18 問の定義(v2.1 の 19 から v2.2 で goal_avoid 撤去で -1)", () => {
+    // v2.2: goal_avoid を撤去したため 19 → 18。
+    // 内訳:
+    //   change_intent / change_direction / step_up_target / chg_target_field
+    //   student_goal_track / student_job_status / student_advance_status
+    //   student_goal_industry / other_field_text / student_goal_advance
+    //   new_entry_direction / second_career_intent
+    //   goal_workstyle(v2.2 で multi 化)/ goal_income / goal_horizon / goal_start_timing
+    //   goal_commit / goal_freenote
+    const goalIds = set.questions.filter((q) => q.axis === "goal");
+    expect(goalIds.length).toBe(18);
+  });
+
+  it("goal_workstyle は multi 7 択(v2.2 で single → multi 化 / remote / wlb は撤去)", () => {
+    const q = getQuestion(set, "goal_workstyle");
+    // v2.2: type が multi に変わっている
+    expect(q?.type).toBe("multi");
+    expect(q?.required).toBe(true);
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      [
+        "company",
+        "public",
+        "freelance",
+        "startup",
+        "multi_job",
+        "same_as_now",
+        "undecided",
+      ].sort(),
+    );
+  });
+
+  it("goal_income は 9 択(no_answer 撤去・same_as_now 追加・低所得層 3 帯細分化)", () => {
+    const q = getQuestion(set, "goal_income");
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      [
+        "same_as_now",
+        "lt200",
+        "200to300",
+        "300to400",
+        "400to600",
+        "600to800",
+        "800to1200",
+        "1200to2000",
+        "gt2000",
+      ].sort(),
+    );
+  });
+
+  it("goal_horizon は 5 択(10y 追加)", () => {
+    const q = getQuestion(set, "goal_horizon");
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      ["1y", "3y", "5y", "10y", "open"].sort(),
+    );
+  });
+
+  it("goal_start_timing は 5 択(v2.1: after_preparation 追加)", () => {
+    const q = getQuestion(set, "goal_start_timing");
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      ["now", "within_3m", "within_1y", "after_preparation", "slow"].sort(),
+    );
+    // 表示順は now → within_3m → within_1y → after_preparation → slow(早い順 → 遅い順)
+    expect(q?.choices?.map((c) => c.value)).toEqual([
+      "now",
+      "within_3m",
+      "within_1y",
+      "after_preparation",
+      "slow",
+    ]);
+    // §9-v2.1-4 採択 C のラベル文言
+    const ap = q?.choices?.find((c) => c.value === "after_preparation");
+    expect(ap?.label).toContain("数年後");
+    expect(ap?.label).toContain("準備期間後");
+  });
+
+  it("goal_commit は 7 択(中立表現)/ v2.2: ラベルから括弧内削除", () => {
+    const q = getQuestion(set, "goal_commit");
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      ["none", "lt5", "5to20", "20to50", "50to100", "100to300", "gt300"].sort(),
+    );
+    // タイトル: 中立表現「初期投資にかけられる金額の目安」
+    expect(q?.title).toContain("初期投資");
+    expect(q?.title).not.toContain("スクール代");
+    expect(q?.description).toContain("使い切る必要はありません");
+    // v2.2: ラベルから括弧内が削除されていること(例: "0円(無料リソース...)" → "0円")
+    const noneChoice = q?.choices?.find((c) => c.value === "none");
+    expect(noneChoice?.label).toBe("0円");
+    expect(noneChoice?.label).not.toContain("(");
+    const lt5Choice = q?.choices?.find((c) => c.value === "lt5");
+    expect(lt5Choice?.label).toBe("〜5万円");
+    expect(lt5Choice?.label).not.toContain("書籍");
+    const gt300Choice = q?.choices?.find((c) => c.value === "gt300");
+    expect(gt300Choice?.label).toBe("300万円以上");
+    expect(gt300Choice?.label).not.toContain("MBA");
+  });
+
+  it("(v2.2) goal_start_timing.next = goal_commit(goal_avoid 撤去で直接接続)", () => {
+    // どの選択肢を選んでも線形に goal_commit に飛ぶ
+    for (const v of ["now", "within_3m", "within_1y", "after_preparation", "slow"]) {
+      expect(
+        getNextQuestionId(set, "goal_start_timing", { goal_start_timing: v }),
+      ).toBe("goal_commit");
+    }
   });
 });
 
@@ -691,8 +1146,8 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
   });
 });
 
-describe("MAY スキップで終端まで到達", () => {
-  it("origin_freenote / free_note を未回答でも終端に届く(MAY のみスキップ・v2.1: current_job_field 追加)", () => {
+describe("MAY スキップで終端まで到達(GOAL v2)", () => {
+  it("origin_freenote / goal_freenote / free_note を未回答でも終端に届く(MAY のみスキップ)", () => {
     const a: AnswerMap = {
       age: 28,
       stage: "employed",
@@ -705,11 +1160,14 @@ describe("MAY スキップで終端まで到達", () => {
       life_constraint: ["none"],
       location: "metro",
       time_available: "1to3h",
-      goal_clarity: "vague",
-      goal_direction: ["specialist"],
-      goal_workstyle: "company",
-      goal_income: "no_answer",
+      // GOAL v2 系統 A: continue → step_up_target / v2.2: workstyle multi 化 + avoid 撤去
+      change_intent: "continue",
+      step_up_target: "specialist",
+      goal_workstyle: ["company"],
+      goal_income: "600to800",
       goal_horizon: "3y",
+      goal_start_timing: "now",
+      goal_commit: "lt5",
       value_priority: "growth",
       work_style_pref: "deep",
       social_pref: "solo",
@@ -889,6 +1347,726 @@ describe("getVisitedIds / pruneAnswers — 放棄した分岐の刈り取り", (
     expect(pruned.__evil).toBeUndefined();
     expect(pruned.stage).toBe("employed");
   });
+
+  // ============================================================
+  // GOAL v2: 系統 A/B 切替時の pruneAnswers
+  // ============================================================
+  it("change_intent=continue のとき change_direction / chg_target_field の残存は落ちる", () => {
+    const a: AnswerMap = {
+      age: 28,
+      stage: "employed",
+      employment_type: "fulltime",
+      current_job_field: "営業",
+      years_employed: "3to5",
+      knowledge_fields: ["sales_retail"],
+      current_income: "500to700",
+      education: "uni",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      change_intent: "continue",
+      // 過去の change → career_change 経路の残存
+      change_direction: "career_change",
+      chg_target_field: ["it_web"],
+      step_up_target: "specialist",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("step_up_target")).toBe(true);
+    expect(visited.has("change_direction")).toBe(false);
+    expect(visited.has("chg_target_field")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.change_direction).toBeUndefined();
+    expect(pruned.chg_target_field).toBeUndefined();
+    expect(pruned.step_up_target).toBe("specialist");
+  });
+
+  it("change_direction=both_unsure のとき step_up_target / chg_target_field の残存は落ちる", () => {
+    const a: AnswerMap = {
+      age: 35,
+      stage: "employed",
+      employment_type: "fulltime",
+      current_job_field: "法人営業",
+      years_employed: "5to10",
+      knowledge_fields: ["sales_retail"],
+      current_income: "500to700",
+      education: "uni",
+      life_constraint: ["caring_kids"],
+      location: "metro",
+      time_available: "1to3h",
+      change_intent: "undecided",
+      change_direction: "both_unsure",
+      // 過去の step_up / career_change 経路の残存
+      step_up_target: "management",
+      chg_target_field: ["data_ai"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("step_up_target")).toBe(false);
+    expect(visited.has("chg_target_field")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.step_up_target).toBeUndefined();
+    expect(pruned.chg_target_field).toBeUndefined();
+  });
+
+  it("stage 切替(employed → student)で系統 A 質問群の残存が落ち、系統 B 質問群が訪問対象に(v2.1: student_job_status も訪問)", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "情報",
+      student_work_exp: ["parttime"],
+      knowledge_fields: ["software_dev"],
+      // 過去の系統 A の残存
+      change_intent: "continue",
+      step_up_target: "specialist",
+      // 新しい系統 B 回答
+      student_goal_track: "job",
+      student_job_status: "exploring",
+      student_goal_industry: ["it_web"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("student_goal_track")).toBe(true);
+    expect(visited.has("student_job_status")).toBe(true);
+    expect(visited.has("student_goal_industry")).toBe(true);
+    expect(visited.has("change_intent")).toBe(false);
+    expect(visited.has("step_up_target")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.change_intent).toBeUndefined();
+    expect(pruned.step_up_target).toBeUndefined();
+    expect(pruned.student_goal_track).toBe("job");
+    expect(pruned.student_job_status).toBe("exploring");
+  });
+
+  it("student_goal_industry から other_field を外すと other_field_text の残存が落ちる", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "情報",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["software_dev"],
+      student_goal_track: "job",
+      // other_field なし
+      student_goal_industry: ["it_web", "marketing_pr"],
+      // 過去の other_field 経路の残存
+      other_field_text: "古い記述",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("other_field_text")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.other_field_text).toBeUndefined();
+  });
+
+  it("student_goal_industry に other_field を含むと other_field_text が訪問対象", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "経済",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["marketing_pr"],
+      student_goal_track: "job",
+      student_goal_industry: ["other_field", "marketing_pr"],
+      other_field_text: "eスポーツ運営",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("other_field_text")).toBe(true);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.other_field_text).toBe("eスポーツ運営");
+  });
+
+  it("stage=retired+early は系統 B(second_career_intent)、change_intent 系の残存は落ちる", () => {
+    const a: AnswerMap = {
+      age: 50,
+      stage: "retired",
+      retired_status: "early",
+      prior_work_exp: "yes",
+      current_job_field: "経理財務",
+      years_employed: "gt10",
+      knowledge_fields: ["finance_acc"],
+      // 過去の系統 A の残存
+      change_intent: "change",
+      change_direction: "career_change",
+      // 新しい系統 B 回答
+      second_career_intent: "re_employment",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("second_career_intent")).toBe(true);
+    expect(visited.has("change_intent")).toBe(false);
+    expect(visited.has("change_direction")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.change_intent).toBeUndefined();
+    expect(pruned.change_direction).toBeUndefined();
+    expect(pruned.second_career_intent).toBe("re_employment");
+  });
+
+  it("stage=retired+re_employ は系統 A(change_intent)、second_career_intent の残存は落ちる", () => {
+    const a: AnswerMap = {
+      age: 62,
+      stage: "retired",
+      retired_status: "re_employ",
+      prior_work_exp: "yes",
+      current_job_field: "教員",
+      years_employed: "gt10",
+      knowledge_fields: ["education"],
+      // 過去の系統 B の残存
+      second_career_intent: "community",
+      // 新しい系統 A 回答
+      change_intent: "continue",
+      step_up_target: "better_conditions",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("change_intent")).toBe(true);
+    expect(visited.has("second_career_intent")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.second_career_intent).toBeUndefined();
+  });
+
+  it("housekeeper + prior_work_exp=no は系統 B(new_entry_direction)、change_intent 系の残存は落ちる", () => {
+    const a: AnswerMap = {
+      age: 28,
+      stage: "housekeeper",
+      prior_work_exp: "no",
+      knowledge_fields: ["none_kn"],
+      // 過去の系統 A の残存
+      change_intent: "change",
+      step_up_target: "specialist",
+      // 新しい系統 B 回答
+      new_entry_direction: ["it_web", "design_creative"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("new_entry_direction")).toBe(true);
+    expect(visited.has("change_intent")).toBe(false);
+    expect(visited.has("step_up_target")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.change_intent).toBeUndefined();
+    expect(pruned.step_up_target).toBeUndefined();
+    expect(pruned.new_entry_direction).toEqual(["it_web", "design_creative"]);
+  });
+
+  it("housekeeper + prior_work_exp=yes は系統 A、new_entry_direction の残存は落ちる", () => {
+    const a: AnswerMap = {
+      age: 32,
+      stage: "housekeeper",
+      prior_work_exp: "yes",
+      current_job_field: "一般事務",
+      years_employed: "3to5",
+      knowledge_fields: ["sales_retail"],
+      // 過去の系統 B 残存
+      new_entry_direction: ["it_web"],
+      // 新しい系統 A 回答
+      change_intent: "change",
+      change_direction: "career_change",
+      chg_target_field: ["it_web", "design_creative"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("change_intent")).toBe(true);
+    expect(visited.has("new_entry_direction")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.new_entry_direction).toBeUndefined();
+  });
+
+  it("student_goal_track=startup は student_goal_industry / advance / other_field_text / 進捗ステータス系すべてを訪問外に(v2.1)", () => {
+    const a: AnswerMap = {
+      age: 22,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u4",
+      student_major: "経営",
+      student_work_exp: ["startup"],
+      knowledge_fields: ["sales_retail"],
+      student_goal_track: "startup",
+      // 残存(v2.1 で status 系も追加)
+      student_job_status: "exploring",
+      student_advance_status: "searching",
+      student_goal_industry: ["it_web"],
+      student_goal_advance: "大学院",
+      other_field_text: "残骸",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("student_job_status")).toBe(false);
+    expect(visited.has("student_advance_status")).toBe(false);
+    expect(visited.has("student_goal_industry")).toBe(false);
+    expect(visited.has("student_goal_advance")).toBe(false);
+    expect(visited.has("other_field_text")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.student_job_status).toBeUndefined();
+    expect(pruned.student_advance_status).toBeUndefined();
+    expect(pruned.student_goal_industry).toBeUndefined();
+    expect(pruned.student_goal_advance).toBeUndefined();
+    expect(pruned.other_field_text).toBeUndefined();
+  });
+
+  // ============================================================
+  // GOAL v2.1 §8-10-3: 学生フロー差分の最小テストセット(6 ケース)
+  // ============================================================
+  it("(v2.1-#1) student_goal_track=job → student_job_status を訪問・advance 系は非訪問", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "情報",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["software_dev"],
+      student_goal_track: "job",
+      student_job_status: "in_selection",
+      student_goal_industry: ["software_dev"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("student_job_status")).toBe(true);
+    expect(visited.has("student_advance_status")).toBe(false);
+    expect(visited.has("student_goal_advance")).toBe(false);
+    expect(visited.has("student_goal_industry")).toBe(true);
+  });
+
+  it("(v2.1-#2) student_goal_track=advance → status → advance(text) → industry の順に訪問・job_status は非訪問", () => {
+    const a: AnswerMap = {
+      age: 18,
+      stage: "student",
+      school_type: "high_school",
+      grade_hs: "hs3",
+      student_major: "理系",
+      student_work_exp: ["none"],
+      knowledge_fields: ["medical_care"],
+      student_goal_track: "advance",
+      student_advance_status: "admitted",
+      student_goal_advance: "医学部",
+      student_goal_industry: ["medical_care"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("student_advance_status")).toBe(true);
+    expect(visited.has("student_goal_advance")).toBe(true);
+    expect(visited.has("student_goal_industry")).toBe(true);
+    expect(visited.has("student_job_status")).toBe(false);
+    // 順序チェックは walk で path 化して確認
+    const path = walk(a);
+    expect(path.indexOf("student_advance_status")).toBeLessThan(
+      path.indexOf("student_goal_advance"),
+    );
+    expect(path.indexOf("student_goal_advance")).toBeLessThan(
+      path.indexOf("student_goal_industry"),
+    );
+  });
+
+  it("(v2.1-#3) advance 経路でも student_goal_industry に other_field を含むと other_field_text 派生する", () => {
+    const a: AnswerMap = {
+      age: 22,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u4",
+      student_major: "経済",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["finance_acc"],
+      student_goal_track: "advance",
+      student_advance_status: "target_decided",
+      student_goal_advance: "大学院(経済)",
+      student_goal_industry: ["other_field", "research"],
+      other_field_text: "宇宙経済学",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("other_field_text")).toBe(true);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.other_field_text).toBe("宇宙経済学");
+  });
+
+  it("(v2.1-#4) advance → startup 切替で advance_status / advance(text) / industry / other_field_text がすべて prune される", () => {
+    const a: AnswerMap = {
+      age: 22,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u4",
+      student_major: "経営",
+      student_work_exp: ["startup"],
+      knowledge_fields: ["sales_retail"],
+      // 切替後
+      student_goal_track: "startup",
+      // 切替前の残存(advance 系)
+      student_advance_status: "searching",
+      student_goal_advance: "大学院",
+      student_goal_industry: ["it_web"],
+      other_field_text: "残骸",
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("student_advance_status")).toBe(false);
+    expect(visited.has("student_goal_advance")).toBe(false);
+    expect(visited.has("student_goal_industry")).toBe(false);
+    expect(visited.has("other_field_text")).toBe(false);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.student_advance_status).toBeUndefined();
+    expect(pruned.student_goal_advance).toBeUndefined();
+    expect(pruned.student_goal_industry).toBeUndefined();
+    expect(pruned.other_field_text).toBeUndefined();
+  });
+
+  it("(v2.1-#5) job → advance 切替で student_job_status が prune され advance_status 経路に切り替わる", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "情報",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["software_dev"],
+      // 切替後
+      student_goal_track: "advance",
+      // 切替前の残存(job 系)
+      student_job_status: "in_selection",
+      // 切替後の新回答
+      student_advance_status: "searching",
+      student_goal_advance: "大学院(情報系)",
+      student_goal_industry: ["software_dev"],
+    };
+    const visited = getVisitedIds(set, a);
+    expect(visited.has("student_job_status")).toBe(false);
+    expect(visited.has("student_advance_status")).toBe(true);
+    expect(visited.has("student_goal_advance")).toBe(true);
+    const pruned = pruneAnswers(set, a);
+    expect(pruned.student_job_status).toBeUndefined();
+    expect(pruned.student_advance_status).toBe("searching");
+  });
+
+  it("(v2.1-#6 / v2.2 改修) 任意の stage で goal_start_timing=after_preparation → goal_commit に進む(v2.2: avoid 撤去で直接接続)", () => {
+    expect(
+      getNextQuestionId(set, "goal_start_timing", {
+        goal_start_timing: "after_preparation",
+      }),
+    ).toBe("goal_commit");
+  });
+});
+
+// ============================================================
+// GOAL v2 ペルソナ別フルパス(specs §5 参照)
+// ============================================================
+describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
+  it("高校生(系統 B / student / advance)で終端まで届く(v2.1: status → advance → industry の順)", () => {
+    const a: AnswerMap = {
+      age: 16,
+      stage: "student",
+      school_type: "high_school",
+      grade_hs: "hs2",
+      student_major: "理系コース",
+      student_work_exp: ["none"],
+      knowledge_fields: ["software_dev"],
+      current_income: "none",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      student_goal_track: "advance",
+      // v2.1 新規: 進学進捗ステータス
+      student_advance_status: "target_decided",
+      student_goal_advance: "大学(情報科学系)",
+      // v2.1 改修: 進学者にも業界を聞く
+      student_goal_industry: ["software_dev", "undecided"],
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["undecided"],
+      goal_income: "300to400",
+      goal_horizon: "10y",
+      goal_start_timing: "within_1y",
+      goal_commit: "20to50",
+      value_priority: "growth",
+      work_style_pref: "deep",
+      social_pref: "solo",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("student_goal_track");
+    expect(path).toContain("student_advance_status");
+    expect(path).toContain("student_goal_advance");
+    expect(path).toContain("student_goal_industry");
+    expect(path).not.toContain("student_job_status");
+    expect(path).not.toContain("change_intent");
+    // 順序: status → advance(text) → industry
+    expect(path.indexOf("student_advance_status")).toBeLessThan(
+      path.indexOf("student_goal_advance"),
+    );
+    expect(path.indexOf("student_goal_advance")).toBeLessThan(
+      path.indexOf("student_goal_industry"),
+    );
+  });
+
+  it("学生 / job + other_field(派生)で終端まで届く(v2.1: student_job_status を経由)", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "経済",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["marketing_pr"],
+      current_income: "none",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      student_goal_track: "job",
+      student_job_status: "researching",
+      student_goal_industry: ["other_field", "marketing_pr"],
+      other_field_text: "eスポーツ業界の運営・大会企画",
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["company"],
+      goal_income: "400to600",
+      goal_horizon: "5y",
+      goal_start_timing: "now",
+      goal_commit: "lt5",
+      value_priority: "growth",
+      work_style_pref: "wide",
+      social_pref: "team",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("student_job_status");
+    expect(path).toContain("student_goal_industry");
+    expect(path).toContain("other_field_text");
+    // 順序: job_status → industry → other_field_text → goal_workstyle
+    expect(path.indexOf("student_job_status")).toBeLessThan(
+      path.indexOf("student_goal_industry"),
+    );
+    expect(path.indexOf("other_field_text")).toBeLessThan(
+      path.indexOf("goal_workstyle"),
+    );
+    // advance 系を経由していないこと
+    expect(path).not.toContain("student_advance_status");
+    expect(path).not.toContain("student_goal_advance");
+  });
+
+  it("学生 / job + other_field なしは other_field_text をスキップ(v2.1: student_job_status は経由)", () => {
+    const a: AnswerMap = {
+      age: 20,
+      stage: "student",
+      school_type: "university",
+      grade_uni: "u3",
+      student_major: "経済",
+      student_work_exp: ["intern"],
+      knowledge_fields: ["marketing_pr"],
+      current_income: "none",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      student_goal_track: "job",
+      student_job_status: "exploring",
+      student_goal_industry: ["marketing_pr", "it_web"],
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["company"],
+      goal_income: "400to600",
+      goal_horizon: "5y",
+      goal_start_timing: "now",
+      goal_commit: "lt5",
+      value_priority: "growth",
+      work_style_pref: "wide",
+      social_pref: "team",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("student_job_status");
+    expect(path).toContain("student_goal_industry");
+    expect(path).not.toContain("other_field_text");
+    expect(path).not.toContain("student_advance_status");
+  });
+
+  it("ITエンジニア(系統 A / continue)で終端まで届く", () => {
+    const a: AnswerMap = {
+      age: 28,
+      stage: "employed",
+      employment_type: "fulltime",
+      current_job_field: "Web エンジニア(バックエンド)",
+      years_employed: "3to5",
+      knowledge_fields: ["software_dev"],
+      current_income: "500to700",
+      education: "uni",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      change_intent: "continue",
+      step_up_target: "specialist",
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["same_as_now"],
+      goal_income: "800to1200",
+      goal_horizon: "3y",
+      goal_start_timing: "now",
+      goal_commit: "20to50",
+      value_priority: "growth",
+      work_style_pref: "deep",
+      social_pref: "team",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("change_intent");
+    expect(path).toContain("step_up_target");
+    expect(path).not.toContain("change_direction");
+    expect(path).not.toContain("chg_target_field");
+  });
+
+  it("フリーター(系統 A / change → career_change)で終端まで届く", () => {
+    const a: AnswerMap = {
+      age: 23,
+      stage: "freeter",
+      freeter_main_work: "飲食店ホール",
+      years_employed: "1to3",
+      knowledge_fields: ["service"],
+      current_income: "lt300",
+      education: "hs",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "weekend",
+      change_intent: "change",
+      change_direction: "career_change",
+      chg_target_field: ["it_web", "software_dev"],
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["company"],
+      goal_income: "400to600",
+      goal_horizon: "3y",
+      goal_start_timing: "within_3m",
+      goal_commit: "20to50",
+      goal_freenote: "プログラミングを独学中",
+      value_priority: "growth",
+      work_style_pref: "deep",
+      social_pref: "team",
+      risk_pref: "risk",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("change_intent");
+    expect(path).toContain("change_direction");
+    expect(path).toContain("chg_target_field");
+    expect(path).not.toContain("step_up_target");
+  });
+
+  it("育休中(系統 A / continue + better_conditions)で終端まで届く", () => {
+    const a: AnswerMap = {
+      age: 38,
+      stage: "parental_leave",
+      parental_child_age: "under1",
+      prior_work_exp: "yes",
+      current_job_field: "小学校教員",
+      years_employed: "gt10",
+      knowledge_fields: ["education"],
+      current_income: "300to500",
+      education: "uni",
+      life_constraint: ["caring_kids"],
+      location: "regional_city",
+      time_available: "lt1h",
+      change_intent: "continue",
+      step_up_target: "better_conditions",
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["same_as_now"],
+      goal_income: "same_as_now",
+      goal_horizon: "1y",
+      goal_start_timing: "within_1y",
+      goal_commit: "none",
+      value_priority: "stability",
+      work_style_pref: "deep",
+      social_pref: "team",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("change_intent");
+  });
+
+  it("休職中(系統 A / undecided + both_unsure)で終端まで届く", () => {
+    const a: AnswerMap = {
+      age: 35,
+      stage: "on_leave",
+      on_leave_reason: "health_mental",
+      prior_work_exp: "yes",
+      current_job_field: "システムエンジニア",
+      years_employed: "5to10",
+      knowledge_fields: ["software_dev"],
+      current_income: "500to700",
+      education: "uni",
+      life_constraint: ["health"],
+      location: "metro",
+      time_available: "weekend",
+      change_intent: "undecided",
+      change_direction: "both_unsure",
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["undecided"],
+      goal_income: "same_as_now",
+      goal_horizon: "open",
+      goal_start_timing: "slow",
+      goal_commit: "none",
+      value_priority: "stability",
+      work_style_pref: "deep",
+      social_pref: "solo",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("change_intent");
+    expect(path).toContain("change_direction");
+    // both_unsure → 共通フロー直行
+    expect(path).not.toContain("step_up_target");
+    expect(path).not.toContain("chg_target_field");
+  });
+
+  it("早期退職(系統 B / second_career_intent)で終端まで届く", () => {
+    const a: AnswerMap = {
+      age: 50,
+      stage: "retired",
+      retired_status: "early",
+      prior_work_exp: "yes",
+      current_job_field: "経理財務マネージャー",
+      years_employed: "gt10",
+      knowledge_fields: ["finance_acc"],
+      current_income: "700to1000",
+      education: "uni",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "flex",
+      second_career_intent: "re_employment",
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["company"],
+      goal_income: "600to800",
+      goal_horizon: "5y",
+      goal_start_timing: "within_3m",
+      goal_commit: "lt5",
+      goal_freenote: "経理財務の知見を活かしたい",
+      value_priority: "meaning",
+      work_style_pref: "deep",
+      social_pref: "solo",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("second_career_intent");
+    expect(path).not.toContain("change_intent");
+  });
+
+  it("主婦 prior_work_exp=no(系統 B / new_entry_direction)で終端まで届く", () => {
+    const a: AnswerMap = {
+      age: 28,
+      stage: "housekeeper",
+      prior_work_exp: "no",
+      knowledge_fields: ["none_kn"],
+      current_income: "none",
+      education: "hs",
+      life_constraint: ["caring_kids"],
+      location: "rural",
+      time_available: "lt1h",
+      new_entry_direction: ["it_web", "design_creative", "undecided"],
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["freelance"],
+      goal_income: "400to600",
+      goal_horizon: "5y",
+      goal_start_timing: "within_1y",
+      goal_commit: "20to50",
+      value_priority: "meaning",
+      work_style_pref: "wide",
+      social_pref: "team",
+      risk_pref: "safe",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("free_note");
+    expect(path).toContain("new_entry_direction");
+    expect(path).not.toContain("change_intent");
+    expect(path).not.toContain("second_career_intent");
+  });
 });
 
 describe("getProgress — セクション化進捗(v2)", () => {
@@ -905,7 +2083,7 @@ describe("getProgress — セクション化進捗(v2)", () => {
     expect(snap.sections[0].step).toBe(1);
   });
 
-  it("GOAL セクションに入ると ORIGIN は done(v2.1: current_job_field 追加)", () => {
+  it("GOAL セクションに入ると ORIGIN は done(v2.1 + GOAL v2: change_intent から開始)", () => {
     const a: AnswerMap = {
       age: 28,
       stage: "employed",
@@ -919,7 +2097,7 @@ describe("getProgress — セクション化進捗(v2)", () => {
       location: "metro",
       time_available: "1to3h",
     };
-    const snap = getProgress(set, "goal_target", a, [
+    const snap = getProgress(set, "change_intent", a, [
       "age",
       "stage",
       "employment_type",
@@ -932,7 +2110,6 @@ describe("getProgress — セクション化進捗(v2)", () => {
       "location",
       "time_available",
       "origin_freenote",
-      "goal_clarity",
     ]);
     const origin = snap.sections.find((s) => s.key === "current")!;
     expect(origin.status).toBe("done");
@@ -965,7 +2142,7 @@ describe("getProgress — セクション化進捗(v2)", () => {
     expect(get({ stage: "student", school_type: "university" })).toBe(12);
   });
 
-  it("totalPercent は 0〜100 に収まる(v2.1: current_job_field 追加)", () => {
+  it("totalPercent は 0〜100 に収まる(v2.1 + GOAL v2)", () => {
     const a: AnswerMap = {
       age: 28,
       stage: "employed",
@@ -978,11 +2155,14 @@ describe("getProgress — セクション化進捗(v2)", () => {
       life_constraint: ["none"],
       location: "metro",
       time_available: "1to3h",
-      goal_clarity: "clear",
-      goal_target: "PM",
-      goal_workstyle: "company",
+      change_intent: "continue",
+      step_up_target: "specialist",
+      // v2.2: multi 化 / goal_avoid は撤去
+      goal_workstyle: ["company"],
       goal_income: "600to800",
       goal_horizon: "3y",
+      goal_start_timing: "now",
+      goal_commit: "lt5",
       value_priority: "growth",
       work_style_pref: "deep",
       social_pref: "team",

@@ -56,12 +56,15 @@ export interface Question {
 export type AnswerValue = string | string[] | number;
 
 // ============================================================
-// 質問セット(specs/origin-questions-v2.md 最終確定版反映)
-// 軸1 ORIGIN(現状, current) v2 / 軸2 GOAL 6問 / 軸3 MINDSET 5問
+// 質問セット(specs/origin-questions-v2.md + specs/goal-questions-v2.md 確定版反映)
+// 軸1 ORIGIN(現状, current) v2.1 / 軸2 GOAL v2(立場別分岐) / 軸3 MINDSET 5問
 //
-// v2 ORIGIN は立場ごとに枝分かれる 22 問。実際に1人が辿る MUST は 11〜13問。
-// MINDSET 側で実装する change_intent / location_preference / remote_preference は
+// ORIGIN は立場ごとに枝分かれる 32 問。実際に1人が辿る MUST は 11〜19 問。
+// GOAL v2 は系統 A(現職持ち層)/ 系統 B(現職を持たない層)で分岐し、
+// 共通フローと合わせて全 14 定義。1人が辿るのは 8〜11 問。
+// MINDSET 側で実装する location_preference / remote_preference は
 // 本書スコープ外(specs §7 申し送り)。
+// change_intent は GOAL v2 に取り込み済み(specs/goal-questions-v2.md §7-2)。
 // ============================================================
 export const QUESTIONS: Question[] = [
   // ============================================================
@@ -726,6 +729,7 @@ export const QUESTIONS: Question[] = [
   },
 
   // §3-22. origin_freenote(現状の補足・MAY・自由記述・全員・機微)
+  // GOAL v2 への入り口: stage + prior_work_exp + retired_status で系統 A/B を判定
   {
     id: "origin_freenote",
     axis: "current",
@@ -737,96 +741,581 @@ export const QUESTIONS: Question[] = [
       "例: 育休中で復職タイミングを模索中 / 大学院に進むか就職か迷っている",
     required: false,
     sensitiveNotice: true,
-    next: "goal_clarity",
+    // GOAL v2 系統判定 (specs/goal-questions-v2.md §8-1)
+    branch: (a) => {
+      // 系統 B: 学生 → student_goal_track
+      if (a.stage === "student") return "student_goal_track";
+      // 系統 B: 退職者(完全退職組: early / looking) → second_career_intent
+      if (
+        a.stage === "retired" &&
+        (a.retired_status === "early" || a.retired_status === "looking")
+      ) {
+        return "second_career_intent";
+      }
+      // 系統 B: 主婦・主夫等で prior_work_exp=no → new_entry_direction
+      const noStageSet = new Set([
+        "housekeeper",
+        "parental_leave",
+        "on_leave",
+        "retired",
+        "other",
+      ]);
+      if (
+        typeof a.stage === "string" &&
+        noStageSet.has(a.stage) &&
+        a.prior_work_exp === "no"
+      ) {
+        return "new_entry_direction";
+      }
+      // それ以外はすべて系統 A → change_intent
+      return "change_intent";
+    },
+    // フォールバック(stage 未確定時の安全弁): 系統 A の入り口
+    next: "change_intent",
   },
 
   // ============================================================
-  // 軸2: 目標(goal)— 既存維持
+  // 軸2: 目標(goal)— v2.2 全面再設計(specs/goal-questions-v2.md §3 参照)
+  // 系統 A(現職持ち層): change_intent → change_direction → step_up_target / chg_target_field
+  // 系統 B(現職を持たない層): student_goal_track / new_entry_direction / second_career_intent
+  // 共通フロー: goal_workstyle(multi v2.2)→ goal_income → goal_horizon → goal_start_timing
+  //          → goal_commit → goal_freenote
+  // v2.2 主な変更: (1) goal_workstyle を single → multi(MUST 1個以上) /
+  //                (2) goal_avoid を完全撤去(goal_start_timing.next を goal_commit に直接接続) /
+  //                (3) goal_commit ラベルから括弧内の具体例を削除(description は維持)
   // ============================================================
+
+  // §3-1. change_intent(系統 A・3 択 MUST)
   {
-    id: "goal_clarity",
+    id: "change_intent",
     axis: "goal",
     type: "single",
-    title: "目指したい方向は決まっていますか?",
+    title: "今のお仕事(または直近のお仕事)を、これからも続けていきたいですか?",
+    description:
+      "ここでは大きな方向だけ伺います。次の質問でもう少し具体的に分岐します。",
     required: true,
     choices: [
-      { value: "clear", label: "明確に決まっている", next: "goal_target" },
-      { value: "vague", label: "なんとなくある", next: "goal_direction" },
       {
-        value: "none",
-        label: "まだ無い / これから探したい",
-        next: "goal_direction",
+        value: "continue",
+        label: "続けたい(今の道で伸ばしたい)",
+      },
+      {
+        value: "change",
+        label: "変えたい(別の選択肢を探したい)",
+      },
+      { value: "undecided", label: "まだ迷っている" },
+    ],
+    // continue → step_up_target に直行 / change・undecided → change_direction
+    branch: (a) => {
+      if (a.change_intent === "continue") return "step_up_target";
+      return "change_direction";
+    },
+  },
+
+  // §3-2. change_direction(系統 A・3 択 MUST・条件付き)
+  {
+    id: "change_direction",
+    axis: "goal",
+    type: "single",
+    title: "変えたい・迷っている方向はどちらに近いですか?",
+    description:
+      "大きな方向を選んでください。両方迷っている場合は「両方迷っている」で OK。",
+    required: true,
+    choices: [
+      {
+        value: "step_up",
+        label: "今の職種・分野の延長で次のステップに進みたい",
+        hint: "例: 同職種で別会社・昇進・独立",
+      },
+      {
+        value: "career_change",
+        label: "今と違う職種・分野に挑戦したい",
+        hint: "例: 営業 → エンジニア / 看護師 → IT",
+      },
+      {
+        value: "both_unsure",
+        label: "両方迷っている(まだ決められない)",
       },
     ],
+    // step_up → step_up_target / career_change → chg_target_field / both_unsure → 共通フロー直行
+    branch: (a) => {
+      if (a.change_direction === "step_up") return "step_up_target";
+      if (a.change_direction === "career_change") return "chg_target_field";
+      return "goal_workstyle";
+    },
   },
+
+  // §3-3. step_up_target(系統 A・4 択 MUST・条件付き)
   {
-    id: "goal_target",
+    id: "step_up_target",
     axis: "goal",
-    type: "text",
-    title: "目指す職業・働き方は?",
-    description: "具体的に思い描いているものを教えてください。",
-    placeholder: "例: プロダクトマネージャー",
-    required: true,
-    next: "goal_workstyle", // goal_direction をスキップして合流
-  },
-  {
-    id: "goal_direction",
-    axis: "goal",
-    type: "multi",
-    title: "惹かれる方向はどれですか?(複数選択可)",
-    description: "ピンとくるものを選んでください。",
+    type: "single",
+    title: "今の分野で、これからどう伸ばしていきたいですか?",
+    description:
+      "専門・人をまとめる・独立・処遇改善 のいずれが近いですか。",
     required: true,
     choices: [
-      { value: "specialist", label: "専門を極める" },
-      { value: "management", label: "マネジメント・人を率いる" },
-      { value: "independent", label: "独立・フリーランス" },
-      { value: "stable", label: "安定した環境" },
-      { value: "social", label: "社会貢献・人の役に立つ" },
-      { value: "creative", label: "クリエイティブ・ものづくり" },
+      {
+        value: "specialist",
+        label: "専門性を深めたい(より高度な技術・知見・資格を取りたい)",
+      },
+      {
+        value: "management",
+        label: "マネジメント・人をまとめる方向に進みたい",
+      },
+      {
+        value: "independent_same",
+        label: "同じ分野で独立・フリーランスに進みたい",
+      },
+      {
+        value: "better_conditions",
+        label: "同じ分野で待遇(給与・労働条件)を改善したい",
+        hint: "例: 同職種で年収アップを狙う転職",
+      },
     ],
+    next: "goal_workstyle",
   },
+
+  // §3-4. chg_target_field(系統 A・multi 21 択 MUST・条件付き)
+  {
+    id: "chg_target_field",
+    axis: "goal",
+    type: "multi",
+    title: "興味のある分野はどれですか?(複数選択可)",
+    description:
+      "ORIGIN で聞いた「知見のある分野」とは別軸で、これから挑戦したい分野を選んでください。経験ゼロでも構いません。迷っている場合は「未定」を選択。",
+    required: true,
+    choices: [
+      { value: "it_web", label: "IT・Web(エンジニアリング以外も含む)" },
+      { value: "software_dev", label: "ソフトウェア開発・プログラミング" },
+      { value: "data_ai", label: "データ・AI・統計" },
+      { value: "design_creative", label: "デザイン・クリエイティブ" },
+      { value: "medical_care", label: "医療・看護・介護" },
+      { value: "education", label: "教育・保育" },
+      { value: "law_admin", label: "法律・行政" },
+      { value: "finance_acc", label: "金融・会計" },
+      {
+        value: "manufacturing",
+        label: "製造・エンジニアリング(機械・電気・化学など)",
+      },
+      { value: "construction", label: "建築・土木" },
+      { value: "service", label: "サービス・接客" },
+      { value: "sales_retail", label: "営業・販売" },
+      { value: "marketing_pr", label: "マーケティング・PR" },
+      { value: "hr_org", label: "人事・組織開発" },
+      { value: "research", label: "研究・学術" },
+      { value: "media", label: "メディア・出版" },
+      { value: "art_music", label: "芸術・音楽" },
+      { value: "agri_fish", label: "農林水産" },
+      { value: "language", label: "語学" },
+      { value: "other_chg", label: "その他" },
+      { value: "undecided", label: "未定・これから探したい" },
+    ],
+    next: "goal_workstyle",
+  },
+
+  // §3-5. student_goal_track(系統 B / 学生・4 択 MUST・条件付き)
+  // v2.1 改修: job / advance ともに進捗ステータス(student_job_status / student_advance_status)
+  // を先に聞く(specs §8-10-2 / かおる修正2 対応)。
+  {
+    id: "student_goal_track",
+    axis: "goal",
+    type: "single",
+    title: "卒業後の方向は、どれが一番近いですか?",
+    description: "いま考えているもので OK。確定していなくても構いません。",
+    required: true,
+    choices: [
+      { value: "job", label: "就職したい(働き先を探したい)" },
+      { value: "advance", label: "進学したい(大学院・専門学校など)" },
+      { value: "startup", label: "起業・独立したい" },
+      { value: "undecided", label: "まだ決まっていない" },
+    ],
+    // v2.1: job → student_job_status / advance → student_advance_status /
+    //       startup・undecided → 共通フロー直行
+    branch: (a) => {
+      if (a.student_goal_track === "job") return "student_job_status";
+      if (a.student_goal_track === "advance") return "student_advance_status";
+      return "goal_workstyle";
+    },
+  },
+
+  // §3-5a-job. student_job_status(系統 B / 学生・job・7 択 MUST・v2.1 新規)
+  // specs §3-5a-job。就活フェーズに応じた提案軸切替に使う(prompt.ts §8-5-2 (i-1))。
+  {
+    id: "student_job_status",
+    axis: "goal",
+    type: "single",
+    title: "就職活動はどのあたりですか?",
+    description:
+      "今の進捗に近いものを一つ選んでください。AI 側で「これから絞り込む段階」「内定持ち」など段階に応じた提案を出し分けます。",
+    required: true,
+    choices: [
+      {
+        value: "exploring",
+        label: "まだ業界・職種選びの段階(これから絞り込みたい)",
+      },
+      {
+        value: "researching",
+        label: "業界・職種は絞れてきた(情報収集・自己分析中)",
+      },
+      {
+        value: "entry_started",
+        label: "エントリー開始(プレエントリー・OB訪問・ES準備など)",
+      },
+      {
+        value: "in_selection",
+        label: "選考中(複数社の面接が進行中)",
+      },
+      {
+        value: "offer_received",
+        label: "内定がある(1社以上 確定済み・選考継続中含む)",
+      },
+      {
+        value: "offer_accepted",
+        label: "内定承諾済み(入社確定)",
+      },
+      {
+        value: "not_started",
+        label: "就活していない・進路未定",
+      },
+    ],
+    next: "student_goal_industry",
+  },
+
+  // §3-5a-advance. student_advance_status(系統 B / 学生・advance・4 択 MUST・v2.1 新規)
+  // specs §3-5a-advance。進学準備フェーズに応じた提案軸切替に使う(prompt.ts §8-5-2 (i-2))。
+  // §9-v2.1-2 採択 A で `reconsidering` を撤去し 4 択化。進学迷いは Q1(student_goal_track)の
+  // `undecided` で救済する設計。
+  {
+    id: "student_advance_status",
+    axis: "goal",
+    type: "single",
+    title: "進学の準備はどのあたりですか?",
+    description:
+      "今の進捗に近いものを一つ選んでください。AI 側で「これから志望校を選ぶ段階」「合格・入学確定」など段階に応じた提案を出し分けます。",
+    required: true,
+    choices: [
+      {
+        value: "searching",
+        label: "まだ進学先を検討中(志望分野を探している)",
+      },
+      {
+        value: "target_decided",
+        label: "志望校が決まっている(受験準備中)",
+      },
+      {
+        value: "in_exam",
+        label: "受験本番中(出願済み・結果待ち含む)",
+      },
+      {
+        value: "admitted",
+        label: "合格・入学確定(進学先決定)",
+      },
+    ],
+    next: "student_goal_advance",
+  },
+
+  // §3-5b. student_goal_industry(系統 B / 学生・multi 21 択 MUST・条件付き)
+  // v2.1 改修: 対象を student_goal_track ∈ {job, advance} に拡大(進学者にも卒業後の業界を聞く /
+  // specs §3-5b / かおる修正1)。「その他」(other_field)選択時は other_field_text 派生に進む。
+  {
+    id: "student_goal_industry",
+    axis: "goal",
+    type: "multi",
+    title: "目指したい業界・職種はどれに近いですか?(複数選択可)",
+    description:
+      "ORIGIN で聞いた「知見のある分野」と同じカテゴリ体系で選んでください。複数選択可。当てはまるものがなければ「その他」を選んで次の質問で自由記述してください。迷っている場合は「未定」を選択。進学を選んだ方も、卒業後に進みたい方向で構いません(まだ具体的に決まっていなければ「未定」で OK)。",
+    required: true,
+    choices: [
+      { value: "it_web", label: "IT・Web(エンジニアリング以外も含む)" },
+      { value: "software_dev", label: "ソフトウェア開発・プログラミング" },
+      { value: "data_ai", label: "データ・AI・統計" },
+      { value: "design_creative", label: "デザイン・クリエイティブ" },
+      { value: "medical_care", label: "医療・看護・介護" },
+      { value: "education", label: "教育・保育" },
+      { value: "law_admin", label: "法律・行政" },
+      { value: "finance_acc", label: "金融・会計" },
+      {
+        value: "manufacturing",
+        label: "製造・エンジニアリング(機械・電気・化学など)",
+      },
+      { value: "construction", label: "建築・土木" },
+      { value: "service", label: "サービス・接客" },
+      { value: "sales_retail", label: "営業・販売" },
+      { value: "marketing_pr", label: "マーケティング・PR" },
+      { value: "hr_org", label: "人事・組織開発" },
+      { value: "research", label: "研究・学術" },
+      { value: "media", label: "メディア・出版" },
+      { value: "art_music", label: "芸術・音楽" },
+      { value: "agri_fish", label: "農林水産" },
+      { value: "language", label: "語学" },
+      {
+        value: "other_field",
+        label: "その他(選択時は次の質問で自由記述)",
+      },
+      { value: "undecided", label: "未定・これから探したい" },
+    ],
+    // other_field を含む multi 回答時は派生質問へ、それ以外は共通フロー直行
+    branch: (a) => {
+      const v = a.student_goal_industry;
+      if (Array.isArray(v) && v.includes("other_field")) {
+        return "other_field_text";
+      }
+      return "goal_workstyle";
+    },
+  },
+
+  // §3-5b-other. other_field_text(派生 text MUST / specs §3-5b-other)
+  // ORIGIN の knowledge_fields → knowledge_fields_other と同じパターンだが、こちらは MUST。
+  {
+    id: "other_field_text",
+    axis: "goal",
+    type: "text",
+    title: "「その他」で選んだ業界・職種を具体的に教えてください",
+    description: "一言で OK。例: eスポーツ運営 / 公認会計士事務所 / 宇宙開発 など。",
+    placeholder: "例: eスポーツ運営",
+    required: true,
+    next: "goal_workstyle",
+  },
+
+  // §3-5c. student_goal_advance(系統 B / 学生・text MUST・条件付き)
+  // v2.1 改修: next を "goal_workstyle" → "student_goal_industry" に変更
+  // (進学者にも卒業後の業界を聞く / specs §8-10-2 / かおる修正1)。
+  {
+    id: "student_goal_advance",
+    axis: "goal",
+    type: "text",
+    title: "進学を考えている分野や学校種別を教えてください",
+    description:
+      "例: 大学院(情報系) / 海外の大学 / 専門学校(看護) / 法科大学院 など。一言で OK。合格・入学確定済みの方は、その学校・分野を書いてください。",
+    placeholder: "例: 大学院(機械工学)",
+    required: true,
+    next: "student_goal_industry",
+  },
+
+  // §3-6. new_entry_direction(系統 B / 主婦主夫等 prior_work_exp=no・multi 21 択 MUST・条件付き)
+  {
+    id: "new_entry_direction",
+    axis: "goal",
+    type: "multi",
+    title: "これから働いてみたい分野はどれに近いですか?(複数選択可)",
+    description:
+      "経験ゼロでも構いません。興味のあるカテゴリを選んでください。迷っている場合は「未定」を選択。",
+    required: true,
+    choices: [
+      { value: "it_web", label: "IT・Web(エンジニアリング以外も含む)" },
+      { value: "software_dev", label: "ソフトウェア開発・プログラミング" },
+      { value: "data_ai", label: "データ・AI・統計" },
+      { value: "design_creative", label: "デザイン・クリエイティブ" },
+      { value: "medical_care", label: "医療・看護・介護" },
+      { value: "education", label: "教育・保育" },
+      { value: "law_admin", label: "法律・行政" },
+      { value: "finance_acc", label: "金融・会計" },
+      {
+        value: "manufacturing",
+        label: "製造・エンジニアリング(機械・電気・化学など)",
+      },
+      { value: "construction", label: "建築・土木" },
+      { value: "service", label: "サービス・接客" },
+      { value: "sales_retail", label: "営業・販売" },
+      { value: "marketing_pr", label: "マーケティング・PR" },
+      { value: "hr_org", label: "人事・組織開発" },
+      { value: "research", label: "研究・学術" },
+      { value: "media", label: "メディア・出版" },
+      { value: "art_music", label: "芸術・音楽" },
+      { value: "agri_fish", label: "農林水産" },
+      { value: "language", label: "語学" },
+      { value: "other_new", label: "その他" },
+      { value: "undecided", label: "未定・これから探したい" },
+    ],
+    next: "goal_workstyle",
+  },
+
+  // §3-7. second_career_intent(系統 B / 退職者 early/looking・5 択 MUST・条件付き)
+  {
+    id: "second_career_intent",
+    axis: "goal",
+    type: "single",
+    title: "これからのセカンドキャリアでは、どんな方向を考えていますか?",
+    description:
+      "大きな方向だけ伺います。引退・趣味活動も含めて構いません。",
+    required: true,
+    choices: [
+      {
+        value: "re_employment",
+        label: "再就職したい(同分野・別分野問わず)",
+      },
+      {
+        value: "independent",
+        label: "独立・コンサル・顧問など個人で活動したい",
+      },
+      {
+        value: "community",
+        label: "地域活動・NPO・ボランティアなど社会貢献中心に",
+      },
+      {
+        value: "retire_hobby",
+        label: "引退して趣味中心に(就労は最小限)",
+      },
+      { value: "undecided", label: "まだ決まっていない" },
+    ],
+    next: "goal_workstyle",
+  },
+
+  // §3-8. goal_workstyle(共通・7 択 MUST multi・「雇用形態に純化」/ v2.2 で multi 化)
+  // v2.2: type を single → multi に変更(複業層・両立模索層を許容するため・MUST 1個以上選択)。
+  // 既存 multi MUST(chg_target_field / knowledge_fields / life_constraint)と同じ動作・
+  // 「未定・こだわらない」(undecided)は単独選択も OK。
   {
     id: "goal_workstyle",
     axis: "goal",
-    type: "single",
-    title: "理想の働き方は?",
+    type: "multi",
+    title: "希望する働き方の形は?(複数選択可)",
+    description:
+      "雇用形態についての希望です。複数選択可。「リモート/出社」「ワークライフバランス」など環境面は別の質問(MINDSET)で伺います。",
     required: true,
     choices: [
-      { value: "company", label: "安定した会社員" },
-      { value: "freelance", label: "フリーランス" },
-      { value: "startup", label: "起業・スタートアップ" },
-      { value: "remote", label: "リモート中心" },
-      { value: "wlb", label: "ワークライフバランス重視" },
+      {
+        value: "company",
+        label: "会社員(正社員・契約・派遣など被雇用全般)",
+      },
+      { value: "public", label: "公務員" },
+      { value: "freelance", label: "フリーランス・個人事業主" },
+      { value: "startup", label: "起業・スタートアップを立ち上げる" },
+      {
+        value: "multi_job",
+        label: "複業・パラレルキャリア(複数の収入源で生計)",
+      },
+      {
+        value: "same_as_now",
+        label: "今の雇用形態でOK",
+        hint: "在職者・フリーランス・経営者向け",
+      },
+      { value: "undecided", label: "未定・こだわらない" },
     ],
+    next: "goal_income",
   },
+
+  // §3-9. goal_income(共通・9 択 MUST・no_answer 撤去 / 機微)
   {
     id: "goal_income",
     axis: "goal",
     type: "single",
-    title: "目指す年収帯は?(任意)",
+    title: "目指したい年収帯は?",
+    description:
+      "現年収との比較で「現状維持志向」「大幅アップ志向」を判別してロードマップに反映します。「今と同じくらいで OK」は現年収を維持したい方向けです。",
     required: true,
+    sensitiveNotice: true,
     choices: [
-      { value: "lt400", label: "〜400万円" },
+      {
+        value: "same_as_now",
+        label: "今と同じくらいで OK(現年収維持)",
+      },
+      { value: "lt200", label: "〜200万円" },
+      { value: "200to300", label: "200〜300万円" },
+      { value: "300to400", label: "300〜400万円" },
       { value: "400to600", label: "400〜600万円" },
       { value: "600to800", label: "600〜800万円" },
       { value: "800to1200", label: "800〜1200万円" },
-      { value: "gt1200", label: "1200万円以上" },
-      { value: "no_answer", label: "こだわらない / 答えない" },
+      { value: "1200to2000", label: "1200〜2000万円" },
+      { value: "gt2000", label: "2000万円以上" },
     ],
+    next: "goal_horizon",
   },
+
+  // §3-10. goal_horizon(共通・5 択 MUST)
   {
     id: "goal_horizon",
     axis: "goal",
     type: "single",
-    title: "どのくらいの期間で実現したいですか?",
+    title: "目標を実現したい期間はどれくらいですか?",
     description: "ロードマップの想定期間の目安にします。",
     required: true,
     choices: [
       { value: "1y", label: "1年くらい" },
       { value: "3y", label: "3年くらい" },
       { value: "5y", label: "5年くらい" },
+      { value: "10y", label: "10年くらい(長期キャリア視野)" },
       { value: "open", label: "期限は決めていない" },
     ],
+    next: "goal_start_timing",
+  },
+
+  // §3-11. goal_start_timing(共通・5 択 MUST / v2.1 改修・after_preparation 追加)
+  // §9-v2.1-4 採択 C で確定ラベル。進学合格組(student_advance_status=admitted)の
+  // 卒業後スタートだけでなく、社会人の「資格取得後」「育休明け」など準備期間後を
+  // 表現できる汎用選択肢として 4 番目に追加。
+  {
+    id: "goal_start_timing",
+    axis: "goal",
+    type: "single",
+    title: "動き出すタイミングは、どれが近いですか?",
+    description:
+      "「いつまでに」(前の質問)とは別に、「いつから動き出すか」を伺います。準備期間の設計に使います。学校の入学・卒業・資格取得・育休明けなど、決まったライフイベントを待ってから動き出す方は「数年後(進学卒業・資格取得・育休明けなど準備期間後)」を選んでください。",
+    required: true,
+    choices: [
+      {
+        value: "now",
+        label: "今すぐ動きたい(数週間以内に何か始めたい)",
+      },
+      { value: "within_3m", label: "3ヶ月以内には動き出したい" },
+      { value: "within_1y", label: "1年以内には動き出したい" },
+      {
+        value: "after_preparation",
+        label:
+          "数年後(進学卒業・資格取得・育休明けなど準備期間後)",
+      },
+      {
+        value: "slow",
+        label: "じっくり考えてから(数年スパンで構想中)",
+      },
+    ],
+    // v2.2: goal_avoid 撤去に伴い next を goal_commit に直接接続
+    next: "goal_commit",
+  },
+
+  // §3-12. goal_avoid — v2.2 で完全撤去
+  // 理由: ほとんどの回答者が全選択肢にチェックを入れて差別化情報として機能しなかったため。
+  // 旧 ID `goal_avoid` を送られたら answers.ts のホワイトリスト検証で 400(未定義 ID として弾く)。
+
+  // §3-13. goal_commit(共通・7 択 MUST・中立表現 / 機微)
+  // 重要: AI プロンプト側で「使い切る必要なし・最低限投資に絞る」制約を明文化する
+  // (specs §8-5-2 (g)(h) / src/lib/ai/prompt.ts 参照)。
+  {
+    id: "goal_commit",
+    axis: "goal",
+    type: "single",
+    title: "進路実現のために、初期投資としてかけられる金額の目安は?",
+    description:
+      "目標に向けた準備期間中の自己投資(教育・ツール・資格・転居等を含めた目安)です。※ あくまで「使える上限の目安」であり、必ず使い切る必要はありません。AI は最終目標の達成に最低限必要な投資だけを提案するため、余裕を持って多めに申告いただいても問題ありません。実際の支払い情報は保存しません。",
+    required: true,
+    sensitiveNotice: true,
+    // v2.2: 選択肢ラベルから括弧内の具体例を削除(シンプル化)。description は維持。
+    choices: [
+      { value: "none", label: "0円" },
+      { value: "lt5", label: "〜5万円" },
+      { value: "5to20", label: "5〜20万円" },
+      { value: "20to50", label: "20〜50万円" },
+      { value: "50to100", label: "50〜100万円" },
+      { value: "100to300", label: "100〜300万円" },
+      { value: "gt300", label: "300万円以上" },
+    ],
+    next: "goal_freenote",
+  },
+
+  // §3-14. goal_freenote(共通・MAY/textarea・機微)
+  {
+    id: "goal_freenote",
+    axis: "goal",
+    type: "textarea",
+    title: "目標について、伝えておきたいことがあれば(任意)",
+    description:
+      "選択肢に当てはまらないこと・もう少し具体的に書きたいこと・配慮してほしいことなど。個人を特定できる情報は書かないでください。",
+    placeholder:
+      "例: 起業したいが具体プロダクトは未定 / 看護師から助産師にステップアップしたい / 海外で働きたい",
+    required: false,
+    sensitiveNotice: true,
+    next: "value_priority",
   },
 
   // ============================================================
