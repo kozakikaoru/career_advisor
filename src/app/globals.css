@@ -103,3 +103,25 @@ body {
 .bar3 {
   background: linear-gradient(90deg, #f472b6, #22d3ee);
 }
+
+/* progress: 完了セクションの満タンピル(シアン→バイオレット) */
+.seg-fill-done {
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+}
+
+/* progress: 現在セクションのパルスドット */
+.pulse-dot {
+  box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.6);
+  animation: pulse-dot 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(168, 85, 247, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+  }
+}

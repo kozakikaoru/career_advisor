@@ -6,16 +6,21 @@ import { CareerPlanSchema, type CareerPlan, type RoadmapNode } from "@/lib/schem
  * 開発・テスト用の Mock プロバイダ。API キー不要・課金なし・即レス。
  * 回答を軽く反映した「それっぽい」構造化結果を返す。
  * 返す前に CareerPlanSchema で検証し、本物のプロバイダと同じ契約を守る。
+ *
+ * v2: ORIGIN の `field`(汎用)が撤去され、立場ごとの具体的な質問(`student_major` /
+ * `freeter_main_work` / `freelance_field`)+ `knowledge_fields`(multi) に分解された。
+ * Mock は「現在地ラベル」を構築するため、立場ごとに代表的なフィールドを優先的に参照する。
  */
 export class MockProvider implements AIProvider {
   readonly name = "mock";
 
   async generateCareerPlan(answers: AnswerMap): Promise<CareerPlan> {
-    const field = strOf(answers.field) || "今の分野";
-    const goalTarget = strOf(answers.goal_target);
-    const stageLabel = STAGE_LABEL[strOf(answers.stage)] ?? "あなた";
+    const stageValue = strOf(answers.stage);
+    const stageLabel = STAGE_LABEL[stageValue] ?? "あなた";
+    const fieldLabel = pickFieldLabel(answers) || "今の分野";
 
-    const currentLabel = goalLabelFromField(field, stageLabel);
+    const goalTarget = strOf(answers.goal_target);
+    const currentLabel = goalLabelFromField(fieldLabel, stageLabel);
     const goalLabel = goalTarget || directionGoalLabel(answers);
     const { durationText, roadmap } = buildRoadmap(answers, currentLabel, goalLabel);
 
@@ -51,16 +56,24 @@ export class MockProvider implements AIProvider {
   }
 }
 
+// v2.1: definitions.ts の stage ラベル(on_leave / retired)に同期。
 const STAGE_LABEL: Record<string, string> = {
   student: "学生",
-  working: "社会人",
-  changing: "キャリアチェンジ検討中",
-  returning: "再スタート中",
+  employed: "在職者",
+  freeter: "フリーター",
+  freelance: "フリーランス",
+  seeking: "求職中",
+  housekeeper: "主婦/主夫",
+  parental_leave: "育休中",
+  on_leave: "休職中",
+  retired: "定年退職後",
+  other: "あなた",
 };
 
 function strOf(v: unknown): string {
   if (typeof v === "string") return v;
   if (Array.isArray(v)) return v.join(" / ");
+  if (typeof v === "number") return String(v);
   return "";
 }
 
@@ -71,6 +84,75 @@ function clamp(s: string, max: number): string {
 function goalLabelFromField(field: string, stageLabel: string): string {
   return clamp(`${field}（${stageLabel}）`, 40);
 }
+
+/**
+ * 「現在地」ラベルに使うフィールド名を回答から優先順に拾う(v2 / v2.1)。
+ * 1) 学生: student_major(自由記述)。中学生は無いので学校種別ラベルで代替
+ * 2) フリーター: freeter_main_work
+ * 3) フリーランス: freelance_field
+ * 4) v2.1: current_job_field(employed / seeking / prior_work_exp=yes 系統で入力される)
+ * 5) 上記以外: knowledge_fields の先頭ラベル
+ */
+function pickFieldLabel(answers: AnswerMap): string {
+  const stage = strOf(answers.stage);
+  if (stage === "student") {
+    const major = strOf(answers.student_major);
+    if (major) return major;
+    // 中学生など学科未入力
+    const schoolType = strOf(answers.school_type);
+    return SCHOOL_TYPE_LABEL[schoolType] ?? "学業中";
+  }
+  if (stage === "freeter") {
+    return strOf(answers.freeter_main_work);
+  }
+  if (stage === "freelance") {
+    return strOf(answers.freelance_field);
+  }
+  // v2.1: 現職または直近の職種を「現在地」ラベルとして優先的に使う
+  const currentJob = strOf(answers.current_job_field);
+  if (currentJob) return currentJob;
+  // 知見のある分野(複数選択)から先頭の見出しを採用
+  const kf = answers.knowledge_fields;
+  if (Array.isArray(kf)) {
+    const first = kf.find(
+      (v) => typeof v === "string" && v !== "none_kn" && v !== "other_kn",
+    );
+    if (first) return KNOWLEDGE_LABEL[first as string] ?? "";
+  }
+  return "";
+}
+
+const SCHOOL_TYPE_LABEL: Record<string, string> = {
+  junior_high: "中学校",
+  high_school: "高校",
+  voc_school: "専門学校",
+  kosen: "高専",
+  junior_college: "短大",
+  university: "大学",
+  graduate: "大学院",
+};
+
+const KNOWLEDGE_LABEL: Record<string, string> = {
+  it_web: "IT・Web",
+  software_dev: "ソフトウェア開発",
+  data_ai: "データ・AI",
+  design_creative: "デザイン",
+  medical_care: "医療・看護・介護",
+  education: "教育・保育",
+  law_admin: "法律・行政",
+  finance_acc: "金融・会計",
+  manufacturing: "製造業",
+  construction: "建築・土木",
+  service: "サービス",
+  sales_retail: "営業・販売",
+  marketing_pr: "マーケティング",
+  hr_org: "人事",
+  research: "研究",
+  media: "メディア",
+  art_music: "芸術",
+  agri_fish: "農林水産",
+  language: "語学",
+};
 
 function directionGoalLabel(answers: AnswerMap): string {
   const dir = answers.goal_direction;
@@ -83,7 +165,10 @@ function directionGoalLabel(answers: AnswerMap): string {
     creative: "ものづくりの担い手",
   };
   if (Array.isArray(dir) && dir.length > 0) {
-    return clamp(map[dir[0]] ?? "理想のキャリア", 40);
+    const head = dir[0];
+    if (typeof head === "string") {
+      return clamp(map[head] ?? "理想のキャリア", 40);
+    }
   }
   return "これから見つける理想の姿";
 }

@@ -6,6 +6,7 @@ import { SingleChoice } from "./SingleChoice";
 import { MultiChoice } from "./MultiChoice";
 import { TextInput } from "./TextInput";
 import { TextArea } from "./TextArea";
+import { NumberInput } from "./NumberInput";
 
 /** 1 問の表示。質問タイプで入力UIを切り替える。 */
 export function QuestionStep({
@@ -16,7 +17,7 @@ export function QuestionStep({
 }: {
   question: Question;
   value: AnswerValue | undefined;
-  onChange: (value: AnswerValue) => void;
+  onChange: (value: AnswerValue | undefined) => void;
   onEnter?: () => void;
 }) {
   const axisLabel = AXIS_LABEL[question.axis];
@@ -61,6 +62,17 @@ export function QuestionStep({
           placeholder={question.placeholder}
           sensitiveNotice={question.sensitiveNotice}
           onChange={onChange}
+        />
+      )}
+      {question.type === "number" && (
+        <NumberInput
+          value={typeof value === "number" ? value : undefined}
+          min={question.numberMin}
+          max={question.numberMax}
+          step={question.numberStep}
+          placeholder={question.numberPlaceholder}
+          onChange={onChange}
+          onEnter={onEnter}
         />
       )}
     </div>
