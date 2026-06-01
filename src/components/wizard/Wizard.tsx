@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   QUESTION_SET,
   getQuestion,
@@ -20,13 +20,55 @@ const set = QUESTION_SET;
 
 type Phase = "consent" | "asking" | "generating" | "error";
 
+// TODO(temp): MINDSET 確認完了後に削除予定
+// (specs/mindset-questions-v2.md §8-9 / 一時機能・URL を知っている人だけが使う開発用)
+// MINDSET セクションの最初の質問 ID(direct-start 用)。
+const DEV_MINDSET_START_ID = "leadership_role";
+
+// TODO(temp): MINDSET 確認完了後に削除予定
+// MINDSET v2 直通モードで自動投入する ORIGIN + GOAL のダミー回答。
+// 「最小限の整合性が取れる値」のみ。本番に発見されてもユーザー視点は通常診断と同等。
+// 系統 A(employed / continue / specialist)+ 知見=IT・Web の minimal path。
+const DEV_MINDSET_DUMMY_ANSWERS: AnswerMap = {
+  // ORIGIN
+  age: 30,
+  stage: "employed",
+  employment_type: "fulltime",
+  current_job_field: "dev",
+  years_employed: "3to5",
+  knowledge_fields: ["it_web"],
+  current_income: "500to700",
+  education: "uni",
+  life_constraint: ["none"],
+  location: "metro",
+  time_available: "1to3h",
+  // GOAL v2.2 系統 A: continue → step_up_target=specialist
+  change_intent: "continue",
+  step_up_target: "specialist",
+  goal_workstyle: ["company"],
+  goal_income: "600to800",
+  goal_horizon: "3y",
+  goal_start_timing: "now",
+  goal_commit: "lt5",
+};
+
 export function Wizard() {
   const router = useRouter();
+  // TODO(temp): MINDSET 確認完了後に削除予定 — searchParams 取得は通常診断には不要
+  const searchParams = useSearchParams();
+  const devMode = searchParams?.get("dev");
+  const isDevMindset = devMode === "mindset";
 
   const [phase, setPhase] = useState<Phase>("consent");
   const [consent, setConsent] = useState(false);
-  const [answers, setAnswers] = useState<AnswerMap>({});
-  const [currentId, setCurrentId] = useState<string>(set.firstId);
+  // TODO(temp): MINDSET 確認完了後に削除予定 — dev=mindset 時は ORIGIN/GOAL のダミー値を投入
+  const [answers, setAnswers] = useState<AnswerMap>(() =>
+    isDevMindset ? { ...DEV_MINDSET_DUMMY_ANSWERS } : {},
+  );
+  // TODO(temp): MINDSET 確認完了後に削除予定 — dev=mindset 時は MINDSET 先頭から開始
+  const [currentId, setCurrentId] = useState<string>(
+    isDevMindset ? DEV_MINDSET_START_ID : set.firstId,
+  );
   const [history, setHistory] = useState<string[]>([]);
 
   // 質問遷移・フェーズ遷移のたびにページトップへスクロール

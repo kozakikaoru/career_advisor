@@ -34,11 +34,22 @@ describe("AnswerMapSchema — 基本動作", () => {
       goal_horizon: "3y",
       goal_start_timing: "now",
       goal_commit: "20to50",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "team",
+      // MINDSET v2 確定版(全員フラット 15 問)
+      leadership_role: "lead_neutral",
+      social_pref: "team_strong",
+      plan_style: "plan_first",
+      unknown_field_jump: "neither",
+      change_attitude: "change_neutral",
+      value_priority: ["growth", "freedom"],
+      meaning_priority: "balance",
+      competition_pref: "neither",
       risk_pref: "safe",
-      free_note: "自由記述テキスト",
+      learning_depth: "deep_focus",
+      failure_recovery: "neither",
+      location_preference: "metro_pref",
+      remote_preference: "hybrid_remote",
+      wlb_priority: "wlb_balance",
+      mindset_freenote: "自由記述テキスト",
     });
     expect(res.success).toBe(true);
   });
@@ -87,12 +98,12 @@ describe("AnswerMapSchema — 基本動作", () => {
     expect(res.success).toBe(false);
   });
 
-  it("text/textarea は自由文字列を許可する", () => {
+  it("text/textarea は自由文字列を許可する(MINDSET v2: mindset_freenote)", () => {
     const res = AnswerMapSchema.safeParse({
       student_major: "情報科学",
       origin_freenote: "復職タイミングを模索中",
       goal_freenote: "プログラミングを独学中",
-      free_note: "改行や記号も含む 自由な文章 !?#",
+      mindset_freenote: "改行や記号も含む 自由な文章 !?#",
     });
     expect(res.success).toBe(true);
   });
@@ -519,9 +530,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_horizon: "3y",
       goal_start_timing: "within_1y",
       goal_commit: "20to50",
-      value_priority: "stability",
-      work_style_pref: "deep",
-      social_pref: "team",
+      value_priority: ["stability"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -546,9 +557,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_horizon: "open",
       goal_start_timing: "slow",
       goal_commit: "none",
-      value_priority: "meaning",
-      work_style_pref: "wide",
-      social_pref: "team",
+      value_priority: ["meaning"],
+      learning_depth: "wide_explore",
+      social_pref: "team_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -578,9 +589,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_horizon: "5y",
       goal_start_timing: "now",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "wide",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "wide_explore",
+      social_pref: "team_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -608,9 +619,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_horizon: "5y",
       goal_start_timing: "now",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "wide",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "wide_explore",
+      social_pref: "team_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -638,9 +649,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_horizon: "5y",
       goal_start_timing: "after_preparation",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -669,9 +680,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_horizon: "10y",
       goal_start_timing: "after_preparation",
       goal_commit: "100to300",
-      value_priority: "meaning",
-      work_style_pref: "deep",
-      social_pref: "team",
+      value_priority: ["meaning"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -700,9 +711,9 @@ describe("AnswerMapSchema — v2.1 / GOAL v2 ペルソナ別フルパス", () =>
       goal_start_timing: "within_3m",
       goal_commit: "lt5",
       goal_freenote: "経理財務の知見を活かしたい",
-      value_priority: "meaning",
-      work_style_pref: "deep",
-      social_pref: "solo",
+      value_priority: ["meaning"],
+      learning_depth: "deep_focus",
+      social_pref: "solo_strong",
       risk_pref: "safe",
     });
     expect(res.success).toBe(true);
@@ -1144,6 +1155,333 @@ describe("AnswerMapSchema — goal_freenote (MAY textarea)", () => {
     expect(
       AnswerMapSchema.safeParse({
         goal_freenote: "あ".repeat(2001),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+// ============================================================
+// MINDSET v2 確定版(specs/mindset-questions-v2.md §8-4)
+// ============================================================
+
+describe("AnswerMapSchema — MINDSET v2 / v1 撤去 ID(回帰防止)", () => {
+  // v1 の `work_style_pref` は v2 で `learning_depth` に改名 → 旧 ID で投げると 400
+  it("旧 ID `work_style_pref` を投げると 400(MINDSET v2 で learning_depth に改名)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ work_style_pref: "deep" }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ work_style_pref: "deep_focus" }).success,
+    ).toBe(false);
+  });
+
+  // v1 の `free_note` は v2 で `mindset_freenote` に改名 → 旧 ID で投げると 400
+  it("旧 ID `free_note` を投げると 400(MINDSET v2 で mindset_freenote に改名)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ free_note: "自由記述" }).success,
+    ).toBe(false);
+  });
+
+  // v1 の 2 択値(social_pref=team/solo, risk_pref=risk)は v2 で 3 択化 → 旧値で投げると 400
+  it("v1 旧値 `social_pref=team` / `solo` は 400(v2 で 3 択化 / team_strong / mix / solo_strong に再編)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ social_pref: "team" }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ social_pref: "solo" }).success,
+    ).toBe(false);
+  });
+
+  it("v1 旧値 `risk_pref=risk` は 400(v2 で risk_balance / risk_take に分割)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ risk_pref: "risk" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — leadership_role (3 択)", () => {
+  it.each(["lead_want", "lead_neutral", "lead_avoid"])(
+    "leadership_role=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ leadership_role: v }).success).toBe(
+        true,
+      );
+    },
+  );
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ leadership_role: "want" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — social_pref (3 択 / v2 拡張)", () => {
+  it.each(["team_strong", "mix", "solo_strong"])(
+    "social_pref=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ social_pref: v }).success).toBe(true);
+    },
+  );
+});
+
+describe("AnswerMapSchema — plan_style (3 択)", () => {
+  it.each(["plan_first", "plan_balance", "action_first"])(
+    "plan_style=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ plan_style: v }).success).toBe(true);
+    },
+  );
+});
+
+describe("AnswerMapSchema — unknown_field_jump (3 択 / v2 確定版 neither 追加)", () => {
+  it.each(["jump_ok", "neither", "jump_anxious"])(
+    "unknown_field_jump=%s は通る",
+    (v) => {
+      expect(
+        AnswerMapSchema.safeParse({ unknown_field_jump: v }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("v2 確定版で追加された neither を受理(中庸シグナル)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ unknown_field_jump: "neither" }).success,
+    ).toBe(true);
+  });
+});
+
+describe("AnswerMapSchema — change_attitude (3 択)", () => {
+  it.each(["change_welcome", "change_neutral", "change_dislike"])(
+    "change_attitude=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ change_attitude: v }).success).toBe(
+        true,
+      );
+    },
+  );
+});
+
+describe("AnswerMapSchema — value_priority (multi MUST 1〜3 個 / maxSelect: 3)", () => {
+  it.each([
+    "stability",
+    "growth",
+    "freedom",
+    "relation",
+    "meaning",
+    "reward",
+  ])("value_priority=[%s] 単独選択は通る(MUST 1 個以上)", (v) => {
+    expect(
+      AnswerMapSchema.safeParse({ value_priority: [v] }).success,
+    ).toBe(true);
+  });
+
+  it("2 個選択(growth + freedom)は通る", () => {
+    expect(
+      AnswerMapSchema.safeParse({ value_priority: ["growth", "freedom"] })
+        .success,
+    ).toBe(true);
+  });
+
+  it("3 個選択(growth + freedom + meaning)は通る(maxSelect 上限内)", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        value_priority: ["growth", "freedom", "meaning"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("4 個選択は 400(maxSelect: 3 を超過)", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        value_priority: ["growth", "freedom", "meaning", "stability"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("5 個・6 個選択も 400(maxSelect: 3 を超過)", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        value_priority: ["stability", "growth", "freedom", "relation", "meaning"],
+      }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({
+        value_priority: [
+          "stability",
+          "growth",
+          "freedom",
+          "relation",
+          "meaning",
+          "reward",
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("空配列は 400(MUST 1 個以上)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ value_priority: [] }).success,
+    ).toBe(false);
+  });
+
+  it("文字列(v1 single 時代の渡し方)は 400(v2 で multi 化)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ value_priority: "growth" }).success,
+    ).toBe(false);
+  });
+
+  it("不正キー(neither など)は 400", () => {
+    expect(
+      AnswerMapSchema.safeParse({ value_priority: ["neither"] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — meaning_priority (3 択)", () => {
+  it.each(["meaning_priority", "balance", "success_priority"])(
+    "meaning_priority=%s は通る",
+    (v) => {
+      expect(
+        AnswerMapSchema.safeParse({ meaning_priority: v }).success,
+      ).toBe(true);
+    },
+  );
+});
+
+describe("AnswerMapSchema — competition_pref (3 択 / v2 確定版 neither 追加)", () => {
+  it.each(["compete_motivated", "neither", "compete_drain"])(
+    "competition_pref=%s は通る",
+    (v) => {
+      expect(
+        AnswerMapSchema.safeParse({ competition_pref: v }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("v2 確定版で追加された neither を受理", () => {
+    expect(
+      AnswerMapSchema.safeParse({ competition_pref: "neither" }).success,
+    ).toBe(true);
+  });
+});
+
+describe("AnswerMapSchema — risk_pref (3 択 / v2 拡張)", () => {
+  it.each(["safe", "risk_balance", "risk_take"])(
+    "risk_pref=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ risk_pref: v }).success).toBe(true);
+    },
+  );
+});
+
+describe("AnswerMapSchema — learning_depth (3 択 / v1 work_style_pref を改名拡張)", () => {
+  it.each(["deep_focus", "mix_learning", "wide_explore"])(
+    "learning_depth=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ learning_depth: v }).success).toBe(
+        true,
+      );
+    },
+  );
+
+  it("v1 旧値(deep / wide)は 400(v2 で命名規則統一)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ learning_depth: "deep" }).success,
+    ).toBe(false);
+    expect(
+      AnswerMapSchema.safeParse({ learning_depth: "wide" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — failure_recovery (3 択 / v2 確定版 neither 追加)", () => {
+  it.each(["retry_fast", "neither", "careful_after"])(
+    "failure_recovery=%s は通る",
+    (v) => {
+      expect(
+        AnswerMapSchema.safeParse({ failure_recovery: v }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("v2 確定版で追加された neither を受理", () => {
+    expect(
+      AnswerMapSchema.safeParse({ failure_recovery: "neither" }).success,
+    ).toBe(true);
+  });
+});
+
+describe("AnswerMapSchema — location_preference (5 択 / GOAL v2.2 §7 申し送り)", () => {
+  it.each([
+    "keep_current",
+    "metro_pref",
+    "rural_pref",
+    "overseas_pref",
+    "anywhere",
+  ])("location_preference=%s は通る", (v) => {
+    expect(
+      AnswerMapSchema.safeParse({ location_preference: v }).success,
+    ).toBe(true);
+  });
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ location_preference: "tokyo" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — remote_preference (5 択 / GOAL v2.2 §7 申し送り)", () => {
+  it.each([
+    "office_pref",
+    "hybrid_office",
+    "hybrid_remote",
+    "remote_full",
+    "flexible",
+  ])("remote_preference=%s は通る", (v) => {
+    expect(
+      AnswerMapSchema.safeParse({ remote_preference: v }).success,
+    ).toBe(true);
+  });
+
+  it("不正値は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({ remote_preference: "fulltime_office" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("AnswerMapSchema — wlb_priority (3 択)", () => {
+  it.each(["wlb_priority", "wlb_balance", "work_priority"])(
+    "wlb_priority=%s は通る",
+    (v) => {
+      expect(AnswerMapSchema.safeParse({ wlb_priority: v }).success).toBe(
+        true,
+      );
+    },
+  );
+});
+
+describe("AnswerMapSchema — mindset_freenote (MAY textarea)", () => {
+  it("自由文字列を許可", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        mindset_freenote: "完璧主義で時間がかかる",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("空文字は型レベルで許可(MAY)", () => {
+    expect(
+      AnswerMapSchema.safeParse({ mindset_freenote: "" }).success,
+    ).toBe(true);
+  });
+
+  it("長すぎる文字列は弾く", () => {
+    expect(
+      AnswerMapSchema.safeParse({
+        mindset_freenote: "あ".repeat(2001),
       }).success,
     ).toBe(false);
   });

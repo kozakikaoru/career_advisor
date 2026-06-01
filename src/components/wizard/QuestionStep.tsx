@@ -46,6 +46,7 @@ export function QuestionStep({
           choices={question.choices ?? []}
           value={Array.isArray(value) ? value : []}
           onChange={onChange}
+          maxSelect={question.maxSelect}
         />
       )}
       {question.type === "text" && (
