@@ -35,6 +35,16 @@ const NUMBER_BOUNDS: Map<string, { min: number; max: number }> = new Map(
     },
   ]),
 );
+/**
+ * multi の選択数上限マップ(MINDSET v2 §8-2 / `value_priority` 等)。
+ * `definitions.ts` の Question.maxSelect から自動生成。
+ * 上限が未指定なら制約なし。
+ */
+const MULTI_MAX_SELECT: Map<string, number> = new Map(
+  QUESTIONS.filter(
+    (q) => q.type === "multi" && typeof q.maxSelect === "number",
+  ).map((q) => [q.id, q.maxSelect as number]),
+);
 
 /** 1 件の回答が「定義済み質問ID + 許可された値」かを検証する。 */
 function isAllowedAnswer(id: string, value: AnswerValue): boolean {
@@ -48,7 +58,13 @@ function isAllowedAnswer(id: string, value: AnswerValue): boolean {
     if (!Array.isArray(value)) return false;
     if (value.length === 0) return false; // 空配列は不可(MUST/MAY 共に「未指定」なら省略する)
     const allowed = CHOICE_VALUES.get(id);
-    return allowed !== undefined && value.every((v) => allowed.has(v));
+    if (allowed === undefined) return false;
+    if (!value.every((v) => allowed.has(v))) return false;
+    // MINDSET v2(specs §8-2 / §8-4): maxSelect 上限の Zod 検証。
+    // 例: value_priority は max 3。Wizard 側のトースト警告と二重ガード。
+    const maxN = MULTI_MAX_SELECT.get(id);
+    if (typeof maxN === "number" && value.length > maxN) return false;
+    return true;
   }
   if (type === "number") {
     if (typeof value !== "number") return false;

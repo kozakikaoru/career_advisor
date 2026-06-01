@@ -50,21 +50,31 @@ export interface Question {
   numberMax?: number;
   numberStep?: number;
   numberPlaceholder?: string;
+  // ---------- multi 型専用(type === "multi" の時のみ使用) ----------
+  /**
+   * MINDSET v2(specs/mindset-questions-v2.md §8-2 確定版)で追加した
+   * multi の選択数上限。指定があれば Wizard 側で「上限到達時にトースト警告 +
+   * 選択を拒否」する。未指定なら上限なし(既存 multi の挙動)。
+   * 現状の利用箇所: `value_priority`(MUST 1〜3 個)。
+   */
+  maxSelect?: number;
 }
 
 /** 回答の保存形 */
 export type AnswerValue = string | string[] | number;
 
 // ============================================================
-// 質問セット(specs/origin-questions-v2.md + specs/goal-questions-v2.md 確定版反映)
-// 軸1 ORIGIN(現状, current) v2.1 / 軸2 GOAL v2(立場別分岐) / 軸3 MINDSET 5問
+// 質問セット(specs/origin-questions-v2.md + specs/goal-questions-v2.md +
+//             specs/mindset-questions-v2.md 確定版反映)
+// 軸1 ORIGIN(現状, current) v2.1 / 軸2 GOAL v2.2(立場別分岐) /
+// 軸3 MINDSET v2 確定版(15 問・全員フラット)
 //
 // ORIGIN は立場ごとに枝分かれる 32 問。実際に1人が辿る MUST は 11〜19 問。
-// GOAL v2 は系統 A(現職持ち層)/ 系統 B(現職を持たない層)で分岐し、
-// 共通フローと合わせて全 14 定義。1人が辿るのは 8〜11 問。
-// MINDSET 側で実装する location_preference / remote_preference は
-// 本書スコープ外(specs §7 申し送り)。
-// change_intent は GOAL v2 に取り込み済み(specs/goal-questions-v2.md §7-2)。
+// GOAL v2.2 は系統 A(現職持ち層)/ 系統 B(現職を持たない層)で分岐し、
+// 共通フローと合わせて全 18 定義。1人が辿るのは 7〜13 問。
+// MINDSET v2 は分岐なしの 15 問(MUST 14 + MAY 1)。全員同じ。
+// 性格・価値観 + GOAL v2.2 §7 申し送り(location_preference / remote_preference /
+// wlb_priority)を吸収。詳細は specs/mindset-questions-v2.md 参照。
 // ============================================================
 export const QUESTIONS: Question[] = [
   // ============================================================
@@ -1315,70 +1325,362 @@ export const QUESTIONS: Question[] = [
       "例: 起業したいが具体プロダクトは未定 / 看護師から助産師にステップアップしたい / 海外で働きたい",
     required: false,
     sensitiveNotice: true,
-    next: "value_priority",
+    // MINDSET v2 確定版: goal_freenote の次は MINDSET の最初の質問
+    // (specs/mindset-questions-v2.md §8-1 / §8-3 接続)。
+    next: "leadership_role",
   },
 
   // ============================================================
-  // 軸3: 性格・価値観(personality)— 既存維持
+  // 軸3: 性格・価値観(personality)— v2 確定版 全面再設計
+  // (specs/mindset-questions-v2.md §3 / §4 / §8 確定版 反映)
+  //
+  // v1 5 問 → v2 15 問(MUST 14 + MAY 1)に総入れ替え。
+  // - 全員フラット(立場分岐なし)。
+  // - A 群コア性格 5 + B 群価値観 3 + D 群リスク 1 + C 群学習 2 +
+  //   E 群働き方 3 + F 群自由記述 1 の 6 群構成。
+  // - 2 択 single は全廃 / すべて 3 択以上(`neither` を真ん中に置く)。
+  // - `value_priority` は multi(MUST 1〜3 個 / maxSelect: 3 / トースト警告)。
+  // - GOAL v2.2 §7 申し送り(location_preference / remote_preference /
+  //   wlb_priority)を E 群で吸収。
   // ============================================================
+
+  // §3-1. leadership_role(リーダー役への志向)【MUST・A群・3 択】
   {
-    id: "value_priority",
+    id: "leadership_role",
     axis: "personality",
     type: "single",
-    title: "仕事で一番大事にしたいことは?",
+    title: "仕事で人をまとめる役は取りたいですか?",
+    description:
+      "「マネジメント / プロジェクトリード / グループの取りまとめ役」のような立場を想定してください。",
     required: true,
     choices: [
-      { value: "stability", label: "安定" },
-      { value: "growth", label: "成長・挑戦" },
-      { value: "freedom", label: "自由・裁量" },
-      { value: "relation", label: "人との関わり" },
-      { value: "meaning", label: "社会的意義" },
-      { value: "reward", label: "報酬" },
+      {
+        value: "lead_want",
+        label: "取りたい(自分から手を挙げたい)",
+      },
+      {
+        value: "lead_neutral",
+        label: "必要なら取る(自分から手は挙げないが、頼まれれば引き受ける)",
+      },
+      {
+        value: "lead_avoid",
+        label: "できれば避けたい(個人で動きたい)",
+      },
     ],
+    next: "social_pref",
   },
-  {
-    id: "work_style_pref",
-    axis: "personality",
-    type: "single",
-    title: "どちらが近いですか?",
-    required: true,
-    choices: [
-      { value: "deep", label: "コツコツ一つを深める" },
-      { value: "wide", label: "新しいことを次々試す" },
-    ],
-  },
+
+  // §3-2. social_pref(チームか一人か)【MUST・A群・3 択 / v1 2 択を拡張】
   {
     id: "social_pref",
     axis: "personality",
     type: "single",
-    title: "どちらが近いですか?",
+    title: "仕事の進め方として、どちらが力を発揮できますか?",
+    description:
+      "普段の働き方の好みです。「協働 / 集中」の質を知りたいだけで、コミュニケーション能力の高低を問うものではありません。",
     required: true,
     choices: [
-      { value: "team", label: "チームで協働する" },
-      { value: "solo", label: "一人で集中する" },
+      { value: "team_strong", label: "チームで協働しているとき" },
+      { value: "mix", label: "両方(プロジェクトや日によって変えたい)" },
+      { value: "solo_strong", label: "一人で集中しているとき" },
     ],
+    next: "plan_style",
   },
+
+  // §3-3. plan_style(計画派か行動派か)【MUST・A群・3 択】
+  {
+    id: "plan_style",
+    axis: "personality",
+    type: "single",
+    title: "新しいことを始める時、どちらが近いですか?",
+    description: "キャリアの動き出し方の好みです。",
+    required: true,
+    choices: [
+      { value: "plan_first", label: "先に計画を立ててから動き出したい" },
+      { value: "plan_balance", label: "計画と行動を行き来したい" },
+      { value: "action_first", label: "まず動いて、走りながら考えたい" },
+    ],
+    next: "unknown_field_jump",
+  },
+
+  // §3-4. unknown_field_jump(未知への飛び込み)【MUST・A群・3 択 / v2 確定版 neither 追加】
+  {
+    id: "unknown_field_jump",
+    axis: "personality",
+    type: "single",
+    title: "経験のない業界・職種に飛び込むことに、抵抗はありますか?",
+    description:
+      "「飛び込んだことがない」のと「飛び込みたくない」を分けて聞きます。「どちらともいえない」は「テーマや状況による」「強い傾向はない」を意味します(回答保留ではありません)。",
+    required: true,
+    choices: [
+      { value: "jump_ok", label: "抵抗は少ない(未経験でも興味があれば飛び込める)" },
+      {
+        value: "neither",
+        label: "どちらともいえない(テーマや状況による / 強い傾向はない)",
+      },
+      {
+        value: "jump_anxious",
+        label: "抵抗が強い(できれば経験のある分野で進みたい)",
+      },
+    ],
+    next: "change_attitude",
+  },
+
+  // §3-5. change_attitude(変化への態度)【MUST・A群・3 択】
+  {
+    id: "change_attitude",
+    axis: "personality",
+    type: "single",
+    title: "仕事や生活で「変化」が起こることに、どう感じますか?",
+    description:
+      "制度変更・部署異動・ツール刷新・引っ越し・組織再編 など、外から来る変化を想定してください。",
+    required: true,
+    choices: [
+      { value: "change_welcome", label: "歓迎する(変化があると面白い)" },
+      { value: "change_neutral", label: "どちらでもない(変化があれば適応する)" },
+      { value: "change_dislike", label: "苦手(なるべく今のままが落ち着く)" },
+    ],
+    next: "value_priority",
+  },
+
+  // §3-6. value_priority(仕事で大事にしたいこと)【MUST・B群・multi MUST 1〜3 個】
+  // v1 single → v2 multi 化 + maxSelect 3(かおる論点 v2-2 採択)。
+  // Wizard 側で 4 個目選択時にトースト警告 + 選択拒否(specs §8-2-2)。
+  {
+    id: "value_priority",
+    axis: "personality",
+    type: "multi",
+    title: "仕事で大事にしたいことを 3 つまで選んでください",
+    description:
+      "1 つでも 2 つでも 3 つでも OK。4 つ以上は選べません(優先順位を絞ってもらうため)。",
+    required: true,
+    maxSelect: 3,
+    choices: [
+      { value: "stability", label: "安定(雇用・収入・生活の安定)" },
+      { value: "growth", label: "成長・挑戦(スキルや経験を伸ばしたい)" },
+      { value: "freedom", label: "自由・裁量(時間や場所・進め方の自由)" },
+      { value: "relation", label: "人との関わり(同僚・顧客・社会との接点)" },
+      { value: "meaning", label: "社会的意義(役に立っている実感)" },
+      { value: "reward", label: "報酬(対価としての高い収入)" },
+    ],
+    next: "meaning_priority",
+  },
+
+  // §3-7. meaning_priority(意義 vs 成功)【MUST・B群・3 択】
+  {
+    id: "meaning_priority",
+    axis: "personality",
+    type: "single",
+    title: "あえて並べるなら、仕事に求めるのは「意義」と「成功」どちら?",
+    description:
+      "二者択一を強制するのは「優先順位の傾き」を取りたいため。両立を否定するものではありません。",
+    required: true,
+    choices: [
+      {
+        value: "meaning_priority",
+        label: "意義(社会の役に立つ・誰かを助ける実感が大事)",
+      },
+      { value: "balance", label: "両立を狙いたい(どちらも大事)" },
+      {
+        value: "success_priority",
+        label: "成功(経済的・社会的に評価されることが大事)",
+      },
+    ],
+    next: "competition_pref",
+  },
+
+  // §3-8. competition_pref(競争心)【MUST・B群・3 択 / v2 確定版 neither 追加】
+  {
+    id: "competition_pref",
+    axis: "personality",
+    type: "single",
+    title: "他人と比べて評価される環境はどう感じますか?",
+    description:
+      "営業ノルマ・売上ランキング・年次評価ランキング・コンペ・コンテスト等を想定してください。「どちらともいえない」は「環境や評価軸による」「強い傾向はない」を意味します(回答保留ではありません)。",
+    required: true,
+    choices: [
+      {
+        value: "compete_motivated",
+        label: "燃える(競争があるほうがやる気が出る)",
+      },
+      {
+        value: "neither",
+        label: "どちらともいえない(環境や評価軸による / 強い傾向はない)",
+      },
+      {
+        value: "compete_drain",
+        label: "疲れる(マイペースのほうが力を発揮できる)",
+      },
+    ],
+    next: "risk_pref",
+  },
+
+  // §3-9. risk_pref(リスク選好)【MUST・D群・3 択 / v1 2 択を拡張】
   {
     id: "risk_pref",
     axis: "personality",
     type: "single",
-    title: "どちらが近いですか?",
+    title: "進路選択で「安定」と「リスクを取る」、どちらに傾きますか?",
+    description:
+      "例えば「大手で安定 vs スタートアップ・独立」「資格職で安定 vs 自分のビジネス」など。",
     required: true,
     choices: [
-      { value: "safe", label: "安定を重視する" },
-      { value: "risk", label: "リスクを取って大きく狙う" },
+      { value: "safe", label: "安定を重視する(リスクは最小化したい)" },
+      {
+        value: "risk_balance",
+        label: "バランス(リスクは限定したいが、伸び代も欲しい)",
+      },
+      {
+        value: "risk_take",
+        label: "リスクを取って大きく狙う(上振れを優先)",
+      },
     ],
+    next: "learning_depth",
   },
+
+  // §3-10. learning_depth(学習スタイル)【MUST・C群・3 択 / v1 work_style_pref を改名拡張】
   {
-    id: "free_note",
+    id: "learning_depth",
+    axis: "personality",
+    type: "single",
+    title: "新しいスキルを学ぶ時、どちらに傾きますか?",
+    description:
+      "スキル習得のスタイルです。今すでに学んでいるかどうかは問いません。",
+    required: true,
+    choices: [
+      {
+        value: "deep_focus",
+        label: "1 つをコツコツ深掘りしたい(専門家を目指す方向)",
+      },
+      {
+        value: "mix_learning",
+        label: "1〜2 個を中心に、関連分野も広げたい",
+      },
+      {
+        value: "wide_explore",
+        label: "興味のあるものを次々試したい(広く触れて選びたい)",
+      },
+    ],
+    next: "failure_recovery",
+  },
+
+  // §3-11. failure_recovery(失敗からの立ち直り)【MUST・C群・3 択 / v2 確定版 neither 追加】
+  {
+    id: "failure_recovery",
+    axis: "personality",
+    type: "single",
+    title: "仕事で失敗した時、自分はどちらのタイプですか?",
+    description:
+      "立ち直る速さや学び方の傾向です。「どちらともいえない」は「失敗の種類による」「両方の側面がある」を意味します(回答保留ではありません)。",
+    required: true,
+    choices: [
+      {
+        value: "retry_fast",
+        label: "切り替えて次に行ける(失敗は学びと捉えて再挑戦)",
+      },
+      {
+        value: "neither",
+        label: "どちらともいえない(失敗の種類による / 両方の側面がある)",
+      },
+      {
+        value: "careful_after",
+        label: "一度引きずる(同じ失敗を避けるため慎重になる)",
+      },
+    ],
+    next: "location_preference",
+  },
+
+  // §3-12. location_preference(勤務地希望)【MUST・E群・5 択 / GOAL v2.2 §7 申し送り】
+  {
+    id: "location_preference",
+    axis: "personality",
+    type: "single",
+    title: "働く場所として希望するのはどこですか?",
+    description:
+      "現在の居住地(ORIGIN の現居住エリア)とは別に、これから働きたい・働き続けたい場所の希望を選んでください。",
+    required: true,
+    choices: [
+      {
+        value: "keep_current",
+        label: "今住んでいる地域で働きたい(転居はしたくない)",
+      },
+      {
+        value: "metro_pref",
+        label: "都市部で働きたい(三大都市圏・地方主要都市)",
+      },
+      {
+        value: "rural_pref",
+        label: "地方・郊外で働きたい(現在都市部にいる人の地方移住含む)",
+      },
+      { value: "overseas_pref", label: "海外で働きたい" },
+      { value: "anywhere", label: "場所はこだわらない" },
+    ],
+    next: "remote_preference",
+  },
+
+  // §3-13. remote_preference(リモート / 出社の希望)【MUST・E群・5 択 / GOAL v2.2 §7 申し送り】
+  {
+    id: "remote_preference",
+    axis: "personality",
+    type: "single",
+    title: "出社 / リモート の希望はどれですか?",
+    description: "現職の現状ではなく、これからの希望を選んでください。",
+    required: true,
+    choices: [
+      { value: "office_pref", label: "出社中心がよい(対面で働きたい)" },
+      {
+        value: "hybrid_office",
+        label: "ハイブリッド・出社多め(週 3 以上出社)",
+      },
+      {
+        value: "hybrid_remote",
+        label: "ハイブリッド・リモート多め(週 3 以上リモート)",
+      },
+      { value: "remote_full", label: "完全リモート希望" },
+      { value: "flexible", label: "こだわらない(業務都合に合わせられる)" },
+    ],
+    next: "wlb_priority",
+  },
+
+  // §3-14. wlb_priority(仕事と私生活のバランス)【MUST・E群・3 択】
+  // GOAL.goal_avoid 撤去(v2.2)の代替フィルタ。長時間労働回避は wlb_priority=wlb_priority で判定。
+  {
+    id: "wlb_priority",
+    axis: "personality",
+    type: "single",
+    title: "仕事と私生活のバランスは、どちらに傾けたいですか?",
+    description: "「バランスを取りたい」を選んでも構いません。",
+    required: true,
+    choices: [
+      {
+        value: "wlb_priority",
+        label: "私生活を優先したい(時間の余裕・趣味・家族の時間を確保)",
+      },
+      {
+        value: "wlb_balance",
+        label: "バランスを取りたい(どちらも犠牲にしたくない)",
+      },
+      {
+        value: "work_priority",
+        label: "仕事に没頭したい(プライベートより仕事の時間に投資)",
+      },
+    ],
+    next: "mindset_freenote",
+  },
+
+  // §3-15. mindset_freenote(性格・価値観の自由記述)【MAY・F群・textarea / v1 free_note 改名】
+  {
+    id: "mindset_freenote",
     axis: "personality",
     type: "textarea",
-    title: "最後に、伝えておきたいことがあれば自由にどうぞ(任意)",
+    title: "性格・価値観について、伝えておきたいことがあれば(任意)",
+    description:
+      "選択肢に当てはまらないこと・補足したいこと・配慮してほしいことなど。個人を特定できる情報・機微情報(政治信条・宗教・健康詳細など)は書かないでください。",
     placeholder:
-      "例: 家庭の事情で勤務地は限定したい、未経験だけど挑戦したい など",
+      "例: 集団行動は苦手だが 1 対 1 では話せる / 完璧主義で時間がかかる / 朝が苦手なので夜型の働き方が合う",
     required: false,
     sensitiveNotice: true,
-    next: null, // 終端
+    next: null, // MINDSET 最終問・終端
   },
 ];
 

@@ -50,11 +50,22 @@ function baseTail(): AnswerMap {
     goal_horizon: "3y",
     goal_start_timing: "now",
     goal_commit: "lt5",
-    value_priority: "growth",
-    work_style_pref: "deep",
-    social_pref: "team",
+    value_priority: ["growth"],
+    learning_depth: "deep_focus",
+    social_pref: "team_strong",
     risk_pref: "safe",
-    free_note: "",
+    // MINDSET v2 確定版で追加された MUST(baseTail で全立場共通の最小値)
+    leadership_role: "lead_neutral",
+    plan_style: "plan_balance",
+    unknown_field_jump: "neither",
+    change_attitude: "change_neutral",
+    meaning_priority: "balance",
+    competition_pref: "neither",
+    failure_recovery: "neither",
+    location_preference: "anywhere",
+    remote_preference: "flexible",
+    wlb_priority: "wlb_balance",
+    mindset_freenote: "",
   };
 }
 
@@ -658,8 +669,8 @@ describe("GOAL v2 共通フローの線形遷移", () => {
     // v2.2: goal_avoid 撤去 → goal_start_timing → goal_commit に直接接続
     ["goal_start_timing", "goal_commit"],
     ["goal_commit", "goal_freenote"],
-    // goal_freenote の次は MINDSET の value_priority
-    ["goal_freenote", "value_priority"],
+    // MINDSET v2: goal_freenote の次は MINDSET の最初の質問 leadership_role
+    ["goal_freenote", "leadership_role"],
   ] as const)("%s → %s", (from, to) => {
     expect(getNextQuestionId(set, from, {})).toBe(to);
   });
@@ -827,7 +838,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
     };
   }
 
-  it("student/junior_high(中学生・学科スキップ)で free_note まで到達(v2.1: education もスキップ)", () => {
+  it("student/junior_high(中学生・学科スキップ)で mindset_freenote まで到達(v2.1: education もスキップ)", () => {
     const a: AnswerMap = {
       age: 14,
       stage: "student",
@@ -837,7 +848,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("grade_jh");
     expect(path).not.toContain("student_major");
     // student_work_exp=[none] のみ → student_work_detail をスキップ
@@ -854,11 +865,11 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
     ["university", "grade_uni", "u3"],
     ["graduate", "grade_grad", "m2"],
   ] as const)(
-    "student/%s フローは grade & student_major を含み終端まで到達(v2.1: student_work_detail を含み education スキップ)",
+    "student/%s フローは grade & student_major を含み終端(mindset_freenote)まで到達(v2.1: student_work_detail を含み education スキップ)",
     (st, gk, gv) => {
       const a = studentAnswers(st, gk, gv);
       const path = walk(a);
-      expect(path[path.length - 1]).toBe("free_note");
+      expect(path[path.length - 1]).toBe("mindset_freenote");
       expect(path).toContain(gk);
       expect(path).toContain("student_major");
       expect(path).toContain("student_work_exp");
@@ -910,7 +921,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("employment_type");
     expect(path).toContain("current_job_field");
     expect(path).toContain("years_employed");
@@ -929,7 +940,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("freeter_main_work");
     expect(path).toContain("years_employed");
     expect(path).not.toContain("employment_type");
@@ -946,7 +957,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("freelance_field");
     expect(path).not.toContain("current_job_field");
     expect(path).not.toContain("prior_work_exp");
@@ -962,7 +973,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("seeking_blank");
     expect(path).toContain("current_job_field");
     expect(path).toContain("years_employed");
@@ -980,7 +991,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("prior_work_exp");
     expect(path).toContain("current_job_field");
     expect(path).toContain("years_employed");
@@ -995,7 +1006,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("prior_work_exp");
     expect(path).not.toContain("current_job_field");
     expect(path).not.toContain("years_employed");
@@ -1013,7 +1024,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("parental_child_age");
     expect(path).toContain("prior_work_exp");
     expect(path).toContain("current_job_field");
@@ -1029,7 +1040,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("prior_work_exp");
     expect(path).not.toContain("current_job_field");
     expect(path).not.toContain("years_employed");
@@ -1046,7 +1057,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("on_leave_reason");
     expect(path).toContain("prior_work_exp");
     expect(path).toContain("current_job_field");
@@ -1061,7 +1072,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).not.toContain("current_job_field");
     expect(path).not.toContain("years_employed");
   });
@@ -1077,7 +1088,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("retired_status");
     expect(path).toContain("prior_work_exp");
     expect(path).toContain("current_job_field");
@@ -1092,7 +1103,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).not.toContain("current_job_field");
     expect(path).not.toContain("years_employed");
   });
@@ -1108,7 +1119,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("other_note");
     expect(path).toContain("prior_work_exp");
     expect(path).toContain("current_job_field");
@@ -1123,7 +1134,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
       ...baseTail(),
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).not.toContain("current_job_field");
     expect(path).not.toContain("years_employed");
   });
@@ -1147,7 +1158,7 @@ describe("立場ごとの完全フロー — 終端まで到達", () => {
 });
 
 describe("MAY スキップで終端まで到達(GOAL v2)", () => {
-  it("origin_freenote / goal_freenote / free_note を未回答でも終端に届く(MAY のみスキップ)", () => {
+  it("origin_freenote / goal_freenote / mindset_freenote を未回答でも終端に届く(MAY のみスキップ)", () => {
     const a: AnswerMap = {
       age: 28,
       stage: "employed",
@@ -1168,13 +1179,24 @@ describe("MAY スキップで終端まで到達(GOAL v2)", () => {
       goal_horizon: "3y",
       goal_start_timing: "now",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "solo",
+      // MINDSET v2: MUST 14 を最小回答(MAY: mindset_freenote 未回答で終端まで届くか確認)
+      leadership_role: "lead_avoid",
+      social_pref: "solo_strong",
+      plan_style: "plan_first",
+      unknown_field_jump: "jump_anxious",
+      change_attitude: "change_neutral",
+      value_priority: ["growth"],
+      meaning_priority: "balance",
+      competition_pref: "compete_drain",
       risk_pref: "safe",
+      learning_depth: "deep_focus",
+      failure_recovery: "careful_after",
+      location_preference: "keep_current",
+      remote_preference: "remote_full",
+      wlb_priority: "wlb_balance",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
   });
 });
 
@@ -1766,13 +1788,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "10y",
       goal_start_timing: "within_1y",
       goal_commit: "20to50",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "solo",
+      value_priority: ["growth"],
+      learning_depth: "deep_focus",
+      social_pref: "solo_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("student_goal_track");
     expect(path).toContain("student_advance_status");
     expect(path).toContain("student_goal_advance");
@@ -1811,13 +1833,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "5y",
       goal_start_timing: "now",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "wide",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "wide_explore",
+      social_pref: "team_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("student_job_status");
     expect(path).toContain("student_goal_industry");
     expect(path).toContain("other_field_text");
@@ -1855,13 +1877,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "5y",
       goal_start_timing: "now",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "wide",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "wide_explore",
+      social_pref: "team_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("student_job_status");
     expect(path).toContain("student_goal_industry");
     expect(path).not.toContain("other_field_text");
@@ -1889,13 +1911,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "3y",
       goal_start_timing: "now",
       goal_commit: "20to50",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("change_intent");
     expect(path).toContain("step_up_target");
     expect(path).not.toContain("change_direction");
@@ -1924,13 +1946,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_start_timing: "within_3m",
       goal_commit: "20to50",
       goal_freenote: "プログラミングを独学中",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "team",
-      risk_pref: "risk",
+      value_priority: ["growth"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
+      risk_pref: "risk_take",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("change_intent");
     expect(path).toContain("change_direction");
     expect(path).toContain("chg_target_field");
@@ -1959,13 +1981,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "1y",
       goal_start_timing: "within_1y",
       goal_commit: "none",
-      value_priority: "stability",
-      work_style_pref: "deep",
-      social_pref: "team",
+      value_priority: ["stability"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("change_intent");
   });
 
@@ -1991,13 +2013,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "open",
       goal_start_timing: "slow",
       goal_commit: "none",
-      value_priority: "stability",
-      work_style_pref: "deep",
-      social_pref: "solo",
+      value_priority: ["stability"],
+      learning_depth: "deep_focus",
+      social_pref: "solo_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("change_intent");
     expect(path).toContain("change_direction");
     // both_unsure → 共通フロー直行
@@ -2027,13 +2049,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_start_timing: "within_3m",
       goal_commit: "lt5",
       goal_freenote: "経理財務の知見を活かしたい",
-      value_priority: "meaning",
-      work_style_pref: "deep",
-      social_pref: "solo",
+      value_priority: ["meaning"],
+      learning_depth: "deep_focus",
+      social_pref: "solo_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("second_career_intent");
     expect(path).not.toContain("change_intent");
   });
@@ -2056,13 +2078,13 @@ describe("GOAL v2 ペルソナ別フルパス — 終端まで到達", () => {
       goal_horizon: "5y",
       goal_start_timing: "within_1y",
       goal_commit: "20to50",
-      value_priority: "meaning",
-      work_style_pref: "wide",
-      social_pref: "team",
+      value_priority: ["meaning"],
+      learning_depth: "wide_explore",
+      social_pref: "team_strong",
       risk_pref: "safe",
     };
     const path = walk(a);
-    expect(path[path.length - 1]).toBe("free_note");
+    expect(path[path.length - 1]).toBe("mindset_freenote");
     expect(path).toContain("new_entry_direction");
     expect(path).not.toContain("change_intent");
     expect(path).not.toContain("second_career_intent");
@@ -2163,30 +2185,254 @@ describe("getProgress — セクション化進捗(v2)", () => {
       goal_horizon: "3y",
       goal_start_timing: "now",
       goal_commit: "lt5",
-      value_priority: "growth",
-      work_style_pref: "deep",
-      social_pref: "team",
+      value_priority: ["growth"],
+      learning_depth: "deep_focus",
+      social_pref: "team_strong",
       risk_pref: "safe",
     };
-    const snap = getProgress(set, "free_note", a, []);
+    const snap = getProgress(set, "mindset_freenote", a, []);
     expect(snap.totalPercent).toBeGreaterThanOrEqual(0);
     expect(snap.totalPercent).toBeLessThanOrEqual(100);
   });
 });
 
 describe("isComplete — 終端判定", () => {
-  it("free_note は終端", () => {
-    expect(isComplete(set, "free_note", {})).toBe(true);
+  it("mindset_freenote は終端(MINDSET v2)", () => {
+    expect(isComplete(set, "mindset_freenote", {})).toBe(true);
   });
 
   it("途中の質問では終端ではない", () => {
     expect(isComplete(set, "stage", { stage: "employed" })).toBe(false);
-    expect(isComplete(set, "value_priority", { value_priority: "growth" })).toBe(
-      false,
-    );
+    // MINDSET v2: value_priority は multi(MUST 1〜3 個)。次は meaning_priority。
+    expect(
+      isComplete(set, "value_priority", { value_priority: ["growth"] }),
+    ).toBe(false);
   });
 
   it("存在しない質問IDは終端扱い(安全側)", () => {
     expect(isComplete(set, "unknown_id", {})).toBe(true);
+  });
+});
+
+// ============================================================
+// MINDSET v2 確定版(specs/mindset-questions-v2.md §3 / §4 / §8)
+// ============================================================
+describe("MINDSET v2 — 質問定義 / 線形遷移 / maxSelect", () => {
+  it("MINDSET セクションは 15 問の定義(MUST 14 + MAY 1)", () => {
+    const mindsetIds = set.questions.filter((q) => q.axis === "personality");
+    expect(mindsetIds.length).toBe(15);
+  });
+
+  it("v1 撤去 ID(work_style_pref / free_note)は定義に存在しない", () => {
+    expect(getQuestion(set, "work_style_pref")).toBeUndefined();
+    expect(getQuestion(set, "free_note")).toBeUndefined();
+  });
+
+  it("MINDSET v2 新規 / 改名 ID が全て定義されている", () => {
+    const ids = [
+      // A 群コア性格
+      "leadership_role",
+      "social_pref",
+      "plan_style",
+      "unknown_field_jump",
+      "change_attitude",
+      // B 群価値観
+      "value_priority",
+      "meaning_priority",
+      "competition_pref",
+      // D 群リスク
+      "risk_pref",
+      // C 群学習
+      "learning_depth",
+      "failure_recovery",
+      // E 群働き方
+      "location_preference",
+      "remote_preference",
+      "wlb_priority",
+      // F 群自由記述
+      "mindset_freenote",
+    ];
+    for (const id of ids) {
+      expect(getQuestion(set, id), `missing: ${id}`).toBeDefined();
+    }
+  });
+
+  it("goal_freenote.next = 'leadership_role'(GOAL → MINDSET の接続)", () => {
+    const q = getQuestion(set, "goal_freenote");
+    expect(q?.next).toBe("leadership_role");
+  });
+
+  it("mindset_freenote.next = null(MINDSET 最終問・終端)", () => {
+    const q = getQuestion(set, "mindset_freenote");
+    expect(q?.next).toBeNull();
+    expect(isComplete(set, "mindset_freenote", {})).toBe(true);
+  });
+
+  it("MINDSET v2 は全員フラット 15 問の線形遷移(分岐なし)", () => {
+    const expected: Array<[string, string | null]> = [
+      ["leadership_role", "social_pref"],
+      ["social_pref", "plan_style"],
+      ["plan_style", "unknown_field_jump"],
+      ["unknown_field_jump", "change_attitude"],
+      ["change_attitude", "value_priority"],
+      ["value_priority", "meaning_priority"],
+      ["meaning_priority", "competition_pref"],
+      ["competition_pref", "risk_pref"],
+      ["risk_pref", "learning_depth"],
+      ["learning_depth", "failure_recovery"],
+      ["failure_recovery", "location_preference"],
+      ["location_preference", "remote_preference"],
+      ["remote_preference", "wlb_priority"],
+      ["wlb_priority", "mindset_freenote"],
+      ["mindset_freenote", null],
+    ];
+    for (const [from, to] of expected) {
+      expect(getNextQuestionId(set, from, {})).toBe(to);
+    }
+  });
+
+  it("value_priority は multi MUST + maxSelect=3", () => {
+    const q = getQuestion(set, "value_priority");
+    expect(q?.type).toBe("multi");
+    expect(q?.required).toBe(true);
+    expect(q?.maxSelect).toBe(3);
+    expect(q?.choices?.map((c) => c.value).sort()).toEqual(
+      [
+        "stability",
+        "growth",
+        "freedom",
+        "relation",
+        "meaning",
+        "reward",
+      ].sort(),
+    );
+  });
+
+  it("v2 確定版で 2 択 single は存在しない(全 single が 3 択以上)", () => {
+    const mindsetSingles = set.questions.filter(
+      (q) => q.axis === "personality" && q.type === "single",
+    );
+    for (const q of mindsetSingles) {
+      expect(
+        (q.choices?.length ?? 0) >= 3,
+        `${q.id} has ${q.choices?.length} choices (< 3)`,
+      ).toBe(true);
+    }
+  });
+
+  it("`neither` 値が 3 問(unknown_field_jump / competition_pref / failure_recovery)で受理可能", () => {
+    for (const id of [
+      "unknown_field_jump",
+      "competition_pref",
+      "failure_recovery",
+    ]) {
+      const q = getQuestion(set, id);
+      const values = q?.choices?.map((c) => c.value) ?? [];
+      expect(values, `${id}.choices`).toContain("neither");
+    }
+  });
+
+  it("ペルソナ: 28 歳 IT エンジニアの MINDSET 15 問パス(全員フラット線形)", () => {
+    // ORIGIN/GOAL は短縮、MINDSET は specs §5-3 のペルソナを再現
+    const a: AnswerMap = {
+      age: 28,
+      stage: "employed",
+      employment_type: "fulltime",
+      current_job_field: "Web エンジニア",
+      years_employed: "3to5",
+      knowledge_fields: ["software_dev"],
+      current_income: "500to700",
+      education: "uni",
+      life_constraint: ["none"],
+      location: "metro",
+      time_available: "1to3h",
+      change_intent: "continue",
+      step_up_target: "specialist",
+      goal_workstyle: ["same_as_now"],
+      goal_income: "800to1200",
+      goal_horizon: "3y",
+      goal_start_timing: "now",
+      goal_commit: "20to50",
+      // MINDSET v2 ペルソナ §5-3
+      leadership_role: "lead_avoid",
+      social_pref: "solo_strong",
+      plan_style: "plan_first",
+      unknown_field_jump: "jump_anxious",
+      change_attitude: "change_neutral",
+      value_priority: ["growth", "freedom"],
+      meaning_priority: "balance",
+      competition_pref: "compete_drain",
+      risk_pref: "risk_balance",
+      learning_depth: "deep_focus",
+      failure_recovery: "careful_after",
+      location_preference: "keep_current",
+      remote_preference: "remote_full",
+      wlb_priority: "wlb_balance",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("mindset_freenote");
+    // MINDSET 15 問が全て path に登場
+    const mindsetExpected = [
+      "leadership_role",
+      "social_pref",
+      "plan_style",
+      "unknown_field_jump",
+      "change_attitude",
+      "value_priority",
+      "meaning_priority",
+      "competition_pref",
+      "risk_pref",
+      "learning_depth",
+      "failure_recovery",
+      "location_preference",
+      "remote_preference",
+      "wlb_priority",
+      "mindset_freenote",
+    ];
+    for (const id of mindsetExpected) {
+      expect(path).toContain(id);
+    }
+  });
+
+  it("ペルソナ: 育休中 38 歳の neither / value_priority 2 個も終端まで届く(specs §5-6)", () => {
+    const a: AnswerMap = {
+      age: 38,
+      stage: "parental_leave",
+      parental_child_age: "under1",
+      prior_work_exp: "yes",
+      current_job_field: "小学校教員",
+      years_employed: "gt10",
+      knowledge_fields: ["education"],
+      current_income: "300to500",
+      education: "uni",
+      life_constraint: ["caring_kids"],
+      location: "regional_city",
+      time_available: "lt1h",
+      change_intent: "continue",
+      step_up_target: "better_conditions",
+      goal_workstyle: ["same_as_now"],
+      goal_income: "same_as_now",
+      goal_horizon: "1y",
+      goal_start_timing: "within_1y",
+      goal_commit: "none",
+      // MINDSET v2 ペルソナ §5-6(育休中・3 択化を活用 / neither + value 2 個)
+      leadership_role: "lead_neutral",
+      social_pref: "team_strong",
+      plan_style: "plan_first",
+      unknown_field_jump: "neither",
+      change_attitude: "change_neutral",
+      value_priority: ["meaning", "stability"],
+      meaning_priority: "meaning_priority",
+      competition_pref: "compete_drain",
+      risk_pref: "safe",
+      learning_depth: "mix_learning",
+      failure_recovery: "careful_after",
+      location_preference: "keep_current",
+      remote_preference: "hybrid_office",
+      wlb_priority: "wlb_priority",
+      mindset_freenote: "復職後も教育の道で続けたい",
+    };
+    const path = walk(a);
+    expect(path[path.length - 1]).toBe("mindset_freenote");
   });
 });

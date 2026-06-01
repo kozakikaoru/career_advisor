@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPrompt } from "./prompt";
+import { buildPrompt, inferBigFive } from "./prompt";
 import type { AnswerMap } from "@/lib/schema/answers";
 
 /**
@@ -248,16 +248,294 @@ describe("buildPrompt — GOAL v2.1 学生フロー整形ガイド", () => {
 // ============================================================
 // v2.1: ロードマップ3本提示は本フェーズではスコープ外(TODO コメントの存在確認)
 // ============================================================
-describe("buildPrompt — v2.1 スコープ外: ロードマップ3本提示", () => {
-  it("AI への指示文に「3本提示」「classifyLayer」などが入っていない(本フェーズではスコープ外)", () => {
+describe("buildPrompt — v2.1 スコープ外: ロードマップ3本提示の AI 指示は出さない", () => {
+  it("AI への指示文に「3本提示」「classifyLayer」が含まれない(本フェーズではスコープ外)", () => {
     const a: AnswerMap = { age: 28, stage: "employed" };
     const p = buildPrompt(a);
     // §8-5-3 のロードマップ 3 本提示は CareerPlanSchema 拡張を伴う別フェーズ。
     // 現スキーマは単一 roadmap のため、AI に「3 本出して」と書かないことを担保。
-    expect(p).not.toContain("3 本");
-    expect(p).not.toContain("3本");
+    // 注: MINDSET v2 で「保守案/チャレンジ案」は解釈ガイドの表現として登場するため、
+    //     「3 本」「3本」「classifyLayer」「3 本提示」のような「AI に 3 本出力させる」表現が
+    //     含まれないことだけを担保する。
+    expect(p).not.toContain("3 本提示");
+    expect(p).not.toContain("3本提示");
     expect(p).not.toContain("classifyLayer");
-    expect(p).not.toContain("保守案");
-    expect(p).not.toContain("チャレンジ案");
+    expect(p).not.toContain("以下の 3 本のロードマップを出力");
+    expect(p).not.toContain("以下の3本のロードマップを出力");
+  });
+});
+
+// ============================================================
+// MINDSET v2 確定版 — inferBigFive + プロンプト整形ガイド検証
+// (specs/mindset-questions-v2.md §7-1 / §7-1-3 / §7-2 / §7-3 / §8-5-2 (m-1)〜(m-6))
+// ============================================================
+
+describe("inferBigFive — MINDSET v2 ビッグファイブ暗黙取得(specs §7-1-1)", () => {
+  it("外向性: lead_want + team_strong → high", () => {
+    const bf = inferBigFive({
+      leadership_role: "lead_want",
+      social_pref: "team_strong",
+    });
+    expect(bf.extraversion).toBe("high");
+  });
+
+  it("外向性: lead_avoid + solo_strong → low", () => {
+    const bf = inferBigFive({
+      leadership_role: "lead_avoid",
+      social_pref: "solo_strong",
+    });
+    expect(bf.extraversion).toBe("low");
+  });
+
+  it("外向性: 中間入力(lead_neutral + mix)→ mid", () => {
+    const bf = inferBigFive({
+      leadership_role: "lead_neutral",
+      social_pref: "mix",
+    });
+    expect(bf.extraversion).toBe("mid");
+  });
+
+  it("協調性: team_strong + compete_drain → high", () => {
+    const bf = inferBigFive({
+      social_pref: "team_strong",
+      competition_pref: "compete_drain",
+    });
+    expect(bf.agreeableness).toBe("high");
+  });
+
+  it("協調性: compete_motivated + solo_strong → low", () => {
+    const bf = inferBigFive({
+      social_pref: "solo_strong",
+      competition_pref: "compete_motivated",
+    });
+    expect(bf.agreeableness).toBe("low");
+  });
+
+  it("協調性: competition_pref=neither(中庸入力)は両極判定の根拠にしない → mid", () => {
+    const bf = inferBigFive({
+      social_pref: "team_strong",
+      competition_pref: "neither",
+    });
+    expect(bf.agreeableness).toBe("mid");
+  });
+
+  it("誠実性: plan_first + deep_focus → high", () => {
+    const bf = inferBigFive({
+      plan_style: "plan_first",
+      learning_depth: "deep_focus",
+    });
+    expect(bf.conscientiousness).toBe("high");
+  });
+
+  it("誠実性: action_first + wide_explore → low", () => {
+    const bf = inferBigFive({
+      plan_style: "action_first",
+      learning_depth: "wide_explore",
+    });
+    expect(bf.conscientiousness).toBe("low");
+  });
+
+  it("神経症傾向: jump_anxious + careful_after + safe → high", () => {
+    const bf = inferBigFive({
+      unknown_field_jump: "jump_anxious",
+      failure_recovery: "careful_after",
+      risk_pref: "safe",
+    });
+    expect(bf.neuroticism).toBe("high");
+  });
+
+  it("神経症傾向: jump_ok + retry_fast + risk_take → low", () => {
+    const bf = inferBigFive({
+      unknown_field_jump: "jump_ok",
+      failure_recovery: "retry_fast",
+      risk_pref: "risk_take",
+    });
+    expect(bf.neuroticism).toBe("low");
+  });
+
+  it("神経症傾向: neither を含むと両極判定にならず mid に倒れる", () => {
+    // 1 つでも neither を含めば mid(中庸入力)
+    const bf1 = inferBigFive({
+      unknown_field_jump: "neither",
+      failure_recovery: "careful_after",
+      risk_pref: "safe",
+    });
+    expect(bf1.neuroticism).toBe("mid");
+    const bf2 = inferBigFive({
+      unknown_field_jump: "jump_ok",
+      failure_recovery: "neither",
+      risk_pref: "risk_take",
+    });
+    expect(bf2.neuroticism).toBe("mid");
+  });
+
+  it("開放性: change_welcome + (wide_explore or mix_learning) → high", () => {
+    const bf1 = inferBigFive({
+      change_attitude: "change_welcome",
+      learning_depth: "wide_explore",
+    });
+    expect(bf1.openness).toBe("high");
+    const bf2 = inferBigFive({
+      change_attitude: "change_welcome",
+      learning_depth: "mix_learning",
+    });
+    expect(bf2.openness).toBe("high");
+  });
+
+  it("開放性: change_dislike + deep_focus → low", () => {
+    const bf = inferBigFive({
+      change_attitude: "change_dislike",
+      learning_depth: "deep_focus",
+    });
+    expect(bf.openness).toBe("low");
+  });
+
+  it("全軸: 入力がない場合はすべて mid に倒れる(安全側)", () => {
+    const bf = inferBigFive({});
+    expect(bf.extraversion).toBe("mid");
+    expect(bf.agreeableness).toBe("mid");
+    expect(bf.conscientiousness).toBe("mid");
+    expect(bf.neuroticism).toBe("mid");
+    expect(bf.openness).toBe("mid");
+  });
+});
+
+describe("buildPrompt — MINDSET v2 プロンプト整形ガイド(specs §8-5-2 (m-1)〜(m-6))", () => {
+  // 「MINDSET 回答が 1 件でも含まれる」とき BF サマリが注入される
+  const baseMindset: AnswerMap = {
+    leadership_role: "lead_want",
+    social_pref: "team_strong",
+    plan_style: "plan_first",
+    unknown_field_jump: "jump_ok",
+    change_attitude: "change_welcome",
+    value_priority: ["growth", "freedom"],
+    meaning_priority: "balance",
+    competition_pref: "compete_motivated",
+    risk_pref: "risk_take",
+    learning_depth: "wide_explore",
+    failure_recovery: "retry_fast",
+    location_preference: "metro_pref",
+    remote_preference: "hybrid_remote",
+    wlb_priority: "wlb_balance",
+  };
+
+  it("(m-1) MINDSET 回答ありで BF サマリセクションが prompt に注入される", () => {
+    const p = buildPrompt(baseMindset);
+    expect(p).toContain("# ユーザーの性格傾向(ビッグファイブ的シグナル");
+    expect(p).toContain("- 外向性:");
+    expect(p).toContain("- 協調性:");
+    expect(p).toContain("- 誠実性:");
+    expect(p).toContain("- 神経症傾向:");
+    expect(p).toContain("- 開放性:");
+  });
+
+  it("(m-1) MINDSET 回答なし(ORIGIN/GOAL のみ)では BF サマリは注入されない", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).not.toContain("# ユーザーの性格傾向(ビッグファイブ的シグナル");
+  });
+
+  it("(m-1) BF サマリの値が inferBigFive と一致する(挑戦志向ペルソナ)", () => {
+    const p = buildPrompt(baseMindset);
+    const bf = inferBigFive(baseMindset);
+    // 全 5 軸の判定値が prompt 文字列に含まれる
+    expect(p).toContain(`- 外向性: ${bf.extraversion}`);
+    expect(p).toContain(`- 協調性: ${bf.agreeableness}`);
+    expect(p).toContain(`- 誠実性: ${bf.conscientiousness}`);
+    expect(p).toContain(`- 神経症傾向: ${bf.neuroticism}`);
+    expect(p).toContain(`- 開放性: ${bf.openness}`);
+  });
+
+  it("(m-2) 軸名を結果画面に直接出さない制約が含まれる(§7-1-2)", () => {
+    const p = buildPrompt(baseMindset);
+    expect(p).toContain("直接的な性格断定をしない");
+    expect(p).toContain("ビッグファイブの軸名");
+    expect(p).toContain("結果画面に出さない");
+  });
+
+  it("(m-2) neither を「明確な傾向なし・中庸」として扱う指示が含まれる(§1-2-1)", () => {
+    const p = buildPrompt(baseMindset);
+    expect(p).toContain("neither");
+    expect(p).toContain("中庸");
+  });
+
+  it("(m-2-§7-1-3) 進路文脈の「うっすら」表現ガイドが含まれる(具体例 + NG 表現)", () => {
+    const p = buildPrompt(baseMindset);
+    // 結果画面冒頭の傾向セクションのガイド
+    expect(p).toContain("結果画面冒頭");
+    expect(p).toContain("「あなたの傾向」");
+    // 具体例 5 個のうち少なくとも 3 個は明文
+    expect(p).toContain("挑戦志向タイプ");
+    expect(p).toContain("計画的に積み上げるタイプ");
+    expect(p).toContain("探索型タイプ");
+    // NG 表現の明示
+    expect(p).toContain("MBTI");
+  });
+
+  it("(m-3) 性格傾向 × 案タイプの対応ガイドが含まれる(§7-2-1)", () => {
+    const p = buildPrompt(baseMindset);
+    expect(p).toContain("外向性高 + 開放性高");
+    expect(p).toContain("スタートアップ");
+    expect(p).toContain("段階踏み");
+    expect(p).toContain("ミッションドリブン");
+  });
+
+  it("(m-4) E 群を「働き方の必須条件」として扱う指示が含まれる(§7-3)", () => {
+    const p = buildPrompt(baseMindset);
+    expect(p).toContain("MINDSET v2 E 群");
+    expect(p).toContain("必須条件");
+    expect(p).toContain("location_preference");
+    expect(p).toContain("remote_preference");
+    expect(p).toContain("wlb_priority");
+    // goal_avoid 撤去後の代替フィルタとしての明示
+    expect(p).toContain("goal_avoid");
+    expect(p).toContain("代替");
+  });
+
+  it("(m-5) mindset_freenote の取り扱いガイドが含まれる(§7-4)", () => {
+    const p = buildPrompt(baseMindset);
+    expect(p).toContain("mindset_freenote");
+    expect(p).toContain("自由記述");
+  });
+
+  it("(m-6) ORIGIN + GOAL + MINDSET の組み合わせ解釈の代表パターンが含まれる(§7-5)", () => {
+    const p = buildPrompt(baseMindset);
+    // 5 パターンのうち代表 2 件以上
+    expect(p).toContain("矛盾シグナル");
+    expect(p).toContain("段階的アプローチ");
+    expect(p).toContain("矛盾シグナル");
+  });
+
+  it("(m-2 否定) 結果画面で軸名を直接出すよう AI に指示していない(NG 文言が prompt 自体に推奨形で出ない)", () => {
+    const p = buildPrompt(baseMindset);
+    // NG 表現の「あなたは外向性が高いです」は引用形式で禁止されていることを担保。
+    // 一方、prompt 自体は「ビッグファイブの軸名を結果画面に出さない」と書いているので、
+    // 「軸名」「外向性」が含まれること自体は OK(指示文として)。
+    // ここでは「結果画面に出さない」「直接的な性格断定をしない」「軸名」のような禁止文脈が
+    // 一貫していることだけ確認。
+    expect(p).toContain("ビッグファイブの軸名");
+    expect(p).toContain("結果画面に出さない");
+  });
+});
+
+// ============================================================
+// goal_commit 制約(§8-5-2 (g)(h))は MINDSET v2 でも維持されること
+// ============================================================
+describe("MINDSET v2 でも goal_commit 制約(情報商材化防止)は維持される", () => {
+  it("(g) MINDSET 回答併存時も goal_commit 制約は変わらず含まれる", () => {
+    const a: AnswerMap = {
+      age: 28,
+      stage: "employed",
+      goal_commit: "gt300",
+      // MINDSET も合わせて投入
+      leadership_role: "lead_want",
+      social_pref: "team_strong",
+      risk_pref: "risk_take",
+    };
+    const p = buildPrompt(a);
+    expect(p).toContain("使い切るべき金額");
+    expect(p).toContain("最低限必要な");
+    expect(p).toContain("情報商材");
+    // MINDSET BF サマリも併存
+    expect(p).toContain("# ユーザーの性格傾向(ビッグファイブ的シグナル");
   });
 });

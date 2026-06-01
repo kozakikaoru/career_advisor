@@ -2,7 +2,7 @@ import type { AnswerMap } from "@/lib/schema/answers";
 import { labelizeAnswers } from "./labels";
 
 /**
- * 回答からプロンプト本文を組み立てる(ai-layer.md §4 / GOAL v2 §8-5)。
+ * 回答からプロンプト本文を組み立てる(ai-layer.md §4 / GOAL v2 §8-5 / MINDSET v2 §8-5)。
  * - 安定キーではなく人間可読ラベルで渡す(labelizeAnswers)。
  * - スキーマと二重に制約を明記する(段数・件数・トーン)。
  * - 占い的な決めつけ、医療・法律・投資助言と誤認される表現は避ける(security の免責方針)。
@@ -31,10 +31,22 @@ import { labelizeAnswers } from "./labels";
  * - (i-4) admitted × after_preparation の組み合わせ解釈(進学卒業後スタートの読み方)。
  * - (i-5) 非学生で after_preparation を選んだケースの解釈(準備イベントの相対時期)。
  *
+ * MINDSET v2 注記(specs §7 / §8-5):
+ * - (m-1) inferBigFive: 進路文脈の MINDSET 回答からビッグファイブ 5 軸を low/mid/high で暗黙取得し、
+ *         AI プロンプトに 5 軸サマリを注入。`neither` 値は中庸入力として `mid` 寄り判定。
+ * - (m-2) 結果画面に「外向性」等のビッグファイブ軸名を直接出さない制約を明文化(§7-1-2)。
+ *         代わりに「進路文脈で『うっすら』表現」する具体例 5 個と NG 表現 4 件を提示(§7-1-3)。
+ * - (m-3) 性格傾向 × 案タイプ対応表(§7-2-1)を解釈ガイドとして明文化。
+ * - (m-4) MINDSET E 群(location_preference / remote_preference / wlb_priority)を
+ *         「働き方の必須条件」として AI に渡す(GOAL.goal_avoid 撤去の代替フィルタ・§7-3)。
+ * - (m-5) mindset_freenote の取り扱い(origin_freenote / goal_freenote と同等)。
+ * - (m-6) ORIGIN + GOAL + MINDSET の組み合わせ解釈の代表パターン(§7-5)。
+ *
  * TODO(roadmap-v2): 結果画面 v2 強化フェーズでロードマップ3本提示を実装。
  *   仕様書 §8-5-3 参照。`CareerPlanSchema` 拡張(roadmaps: [3])+
  *   AI プロンプトに層判定(classifyLayer:迷い層 vs 確定層)+ 3 本提示制約を追加。
- *   本フェーズ(v2.1 差分実装)ではスコープ外。
+ *   性格傾向 × 案タイプ対応表(MINDSET v2 §7-2-1)はその時点でロードマップ生成に直結させる。
+ *   本フェーズ(MINDSET v2 差分実装)では方針コメント止まり。
  */
 export function buildPrompt(answers: AnswerMap): string {
   const labeled = labelizeAnswers(answers);
@@ -106,6 +118,75 @@ export function buildPrompt(answers: AnswerMap): string {
     "- 転向パターン:「文学部進学 + 業界=IT・Web」「教育学部 + 業界=デザイン・クリエイティブ」→ 分野転向志向。進学先の学びを土台にしつつ、卒業時に別分野へ進む意向。ロードマップでは「進学中に副専攻・独学で転向先のスキルを積む」プランを織り込む。",
     "- 探索パターン: 業界=undecided → 進学先で学びながら方向性を探りたい段階。AI は進学先からの推論で具体候補を提示する(「分からないので分かりません」と返さない)。ロードマップでは「進学先のカリキュラム + 進学中の業界探索イベント・インターン」を提案。",
     "- 進学先と業界が「整合していないからおかしい」と判断しないこと。ユーザー本人の意思を尊重する。",
+    "",
+    // ============================================================
+    // MINDSET v2 解釈ガイド(常時注入・静的)
+    // specs/mindset-questions-v2.md §7-1-2 / §7-1-3 / §7-2-2 / §7-3 / §7-4
+    // ============================================================
+    "# 解釈の前提: MINDSET v2 — 性格傾向の暗黙取得とロードマップへの反映",
+    "## ビッグファイブ的シグナルの扱い(§7-1)",
+    "- 後段に性格傾向セクション(ビッグファイブの 5 軸 low/mid/high)がある場合、それは進路文脈の MINDSET 回答から AI 側で暗黙的に推定したシグナル。",
+    "- ユーザーが直接「外向的か?」と聞かれたわけではない。性格テストの結果ではなく、進路選択への参考シグナルとして扱う。",
+    "- ビッグファイブの軸名(外向性 / 協調性 / 誠実性 / 神経症傾向 / 開放性)を結果画面・ロードマップ文言・候補説明・パーソナリティセクション等に **直接出さない** こと。これは厳守。",
+    "- 性格類型(MBTI / エニアグラム等)を持ち出さない。数値・スコア・パーセンタイル等を性格軸として出さない(traits.level は別の進路文脈の指標として OK)。",
+    "- `unknown_field_jump` / `competition_pref` / `failure_recovery` で「neither」を選んだ場合は「明確な傾向なし・中庸」として解釈し、極端な性格断定の根拠にしないでください(「答えない」とは別物・意味のある中庸シグナル)。",
+    "- meaning_priority と value_priority は重複する側面があるが、両方を組み合わせて『社会的意義への重み』を判定する。value_priority に meaning が含まれかつ meaning_priority=meaning_priority の場合は強い意味志向、value_priority に meaning が含まれず meaning_priority=success_priority の場合は強い成功志向。",
+    "## 結果画面冒頭の「あなたの傾向」セクション(§7-1-3)",
+    "- 結果画面冒頭に「あなたの傾向」として 2〜3 文の傾向要約を進路文脈の言葉で書く。",
+    "- 使ってよい表現例:",
+    "  - 「あなたは挑戦志向タイプ。新しい環境や未知の分野に飛び込んで成長を取りに行く姿勢が見えます」(外向性高 + 開放性高 + リスク選好)",
+    "  - 「人と協働しながら成長したいタイプ。チームの中で力を発揮し、関係性を大切にする傾向があります」(外向性高 + 協調性高 + WLB バランス)",
+    "  - 「計画的に積み上げるタイプ。一つの分野を腰を据えて深掘りし、着実に専門性を築く志向が見えます」(誠実性高 + 安定志向 + 深掘り学習)",
+    "  - 「社会的な意義と生活のバランスを大切にするタイプ。仕事の役立ち感と私生活の充実を両立したい志向が見えます」(意味志向強 + WLB 重視)",
+    "  - 「探索型タイプ。複数の分野を試しながら自分に合うものを見つけたい志向が見えます」(開放性高 + 学習広探索 + 変化歓迎)",
+    "- NG 表現:",
+    "  - 「あなたは外向性が高いです」「協調性スコアは平均より高めです」(軸名直接 NG)",
+    "  - 「あなたの性格分析: 外向性=high / 開放性=high」(軸名 + 数値 NG)",
+    "  - 「あなたは ENTJ タイプ」「MBTI でいうと…」(他類型 NG)",
+    "  - 「あなたは ○○ な人です」(強い断定 NG。「○○ なタイプ / 志向が見えます」のような柔らかい表現に)",
+    "## 性格傾向 × 案タイプの対応(§7-2-1 / ロードマップ生成時の参考)",
+    "- 外向性高 + 開放性高 → スタートアップ系・営業職・事業開発をチャレンジ案でメイン提案。保守案で営業職を出すと物足りなさを感じやすい。",
+    "- 神経症傾向高(unknown_field_jump=jump_anxious + failure_recovery=careful_after + risk_pref=safe)+ 安定志向 → 保守案を厚く、チャレンジ案でも「副業で段階的に試す」「資格取得後にスピンアウト」など段階踏みを必ず含める。一気に独立・起業は出さない。",
+    "- 開放性高(change_attitude=change_welcome + learning_depth=wide_explore) + risk_take → 海外・起業・業界横断案で踏み込んで OK。",
+    "- 意味志向(meaning_priority=meaning_priority)+ 達成欲求(competition_pref=compete_motivated) → ミッションドリブン型。社会起業・ソーシャルベンチャー・教育・医療を厚く。",
+    "- 外向性低 + 誠実性高 + 開放性低 → 専門職継続 / 公務員を保守案に、マネジメント案は出さない。スペシャリスト独立をチャレンジ案に。",
+    "- 協調性高 + WLB 重視 → 安定大手・公共系 / 同職種で残業少なめ。完全個人事業は控えめに。",
+    "## 進路提案の言語化スタイル(§7-2-2)",
+    "- 「あなたは外向的なので営業がおすすめ」のような直接断定 NG。",
+    "- 「この案では人と関わる機会が多く、リーダー役を取りやすい」のように進路文脈で言語化する。",
+    "",
+    "# 解釈の前提: MINDSET v2 E 群 — 働き方の必須条件(§7-3)",
+    "これらは「希望」ではなく「必須条件」として扱ってください。ロードマップで提案する企業・職種・雇用形態は、これらの条件を満たすものに絞ること。3 案すべて(保守 / 標準 / チャレンジ)でこれらの条件を満たすこと。違反する案は出さないこと。",
+    "- location_preference:",
+    "  - keep_current → 現居住地(ORIGIN.location)から大きく離れない選択肢のみ提案",
+    "  - metro_pref → 都市部勤務(リモートOK含む)",
+    "  - rural_pref → 地方・郊外勤務(リモートOK含む)",
+    "  - overseas_pref → 海外勤務または海外駐在前提",
+    "  - anywhere → 制約なし",
+    "- remote_preference:",
+    "  - office_pref → リモート前提の職種は提案しない",
+    "  - hybrid_office → 完全リモート企業は提案しない(週 3 以上出社)",
+    "  - hybrid_remote → 完全出社企業は提案しない(週 3 以上リモート)",
+    "  - remote_full → リモート可の企業・職種のみ提案",
+    "  - flexible → 制約なし",
+    "- wlb_priority:",
+    "  - wlb_priority → 残業前提・長時間労働の企業は提案しない",
+    "  - wlb_balance → 標準的な働き方を中心に提案",
+    "  - work_priority → 没頭型キャリア・スタートアップ・コンサル・MBA 等を提案して OK",
+    "注: goal_avoid(GOAL v2.2 で撤去)の代替として MINDSET E 群を必須フィルタとして使う。「長時間労働回避」は wlb_priority=wlb_priority、「出社必須回避」は remote_preference=hybrid_remote / remote_full、「転居・出張多め回避」は location_preference=keep_current で判定。",
+    "",
+    "# 解釈の前提: mindset_freenote(性格・価値観の自由記述・§7-4)",
+    "- ユーザーが選択肢で表現しきれなかった性格・価値観の補足が記載されている可能性あり。",
+    "- 個別事情(完璧主義・HSP 的気質・夜型/朝型・対人スタイル等)が記載されていたらロードマップに反映する(無視しない)。",
+    "- 個人を特定できる情報(企業名・人名等)が記載されていても出力に含めないこと。",
+    "- 機微情報(健康詳細・宗教・政治信条等)が記載されていても、AI の判断には使うが結果画面の文言には出さないこと。",
+    "",
+    "# 解釈の前提: ORIGIN + GOAL + MINDSET の組み合わせ(§7-5)",
+    "- GOAL.goal_workstyle=startup + MINDSET.risk_pref=safe + 神経症傾向=high → 矛盾シグナル。本人は起業に憧れるが心理的リスク許容は低い → 段階的アプローチ(副業 → スピンアウト → 独立)を提案。一気に起業案は控える。",
+    "- GOAL.change_intent=continue + MINDSET.開放性=high + change_attitude=change_welcome → 本人は「続けたい」と言うが性格的に変化を求める傾向あり → 保守案で「同職種で別企業」、標準案で「ジョブチェンジ」、チャレンジ案で「業界横断」を出して比較材料を提示。",
+    "- ORIGIN.life_constraint=caring_kids + MINDSET.wlb_priority=wlb_priority + remote_full → 強い在宅 WLB 重視シグナル → リモート可の職種を保守案で厚く、出社必須案は 3 案すべてで排除。",
+    "- ORIGIN.knowledge_fields=medical_care + GOAL.career_change + MINDSET.learning_depth=deep_focus + meaning_priority=meaning_priority → 医療領域の知見 × 意味志向 × 専門深化 → 医療 × IT(医療情報・ヘルスケア DX)/ 医療 × 教育(看護教育)/ 医療 × 行政(公衆衛生)など医療領域内で別職種に転向するチャレンジ案を提案。",
+    "- GOAL.goal_workstyle=[freelance, multi_job] + MINDSET.leadership_role=lead_avoid + social_pref=solo_strong + value_priority に freedom → フリーランス志向と性格が完全整合 → 3 案すべてフリーランス前提で粒度違いを提示(個人事業主 / 法人化 / 複業構成)。",
     ...dynamic,
     "",
     "# 出力の制約",
@@ -129,6 +210,26 @@ function buildInterpretationNotes(answers: AnswerMap): string[] {
   if (trend) {
     out.push("");
     out.push(`# 年収トレンド: ${trend}`);
+  }
+
+  // (m-1) MINDSET v2 ビッグファイブ的シグナルの暗黙取得(specs §7-1)
+  // MINDSET の主要回答(コア性格 5 + 学習 + リスク)が 1 件でもあれば 5 軸サマリを注入。
+  // どれも未回答の場合は注入しない(ORIGIN/GOAL のみのテストや /diagnosis?dev=mindset 前の状態に配慮)。
+  if (hasAnyMindsetCore(answers)) {
+    const bf = inferBigFive(answers);
+    out.push("");
+    out.push("# ユーザーの性格傾向(ビッグファイブ的シグナル / 暗黙取得)");
+    out.push(`- 外向性: ${bf.extraversion}`);
+    out.push(`- 協調性: ${bf.agreeableness}`);
+    out.push(`- 誠実性: ${bf.conscientiousness}`);
+    out.push(`- 神経症傾向: ${bf.neuroticism}`);
+    out.push(`- 開放性: ${bf.openness}`);
+    out.push(
+      "※ これらはユーザーが直接「外向的か?」と聞かれたものではなく、進路文脈の質問から暗黙的に推定したシグナルです。",
+    );
+    out.push(
+      "※ ユーザーには「あなたは外向性が高い」のような直接的な性格断定をしないでください(ビッグファイブの軸名を結果画面に出さない)。",
+    );
   }
 
   // (b) change_intent=undecided + change_direction=both_unsure
@@ -268,6 +369,116 @@ const ADV_STATUS_PROMPT: Record<string, string> = {
   admitted:
     "合格・入学確定。進学後の学習設計と卒業後の業界選択を中心に提案。goal_start_timing=after_preparation との整合性を最優先で確認。",
 };
+
+// ============================================================
+// MINDSET v2: ビッグファイブ的シグナル暗黙取得(specs §7-1-1)
+// ============================================================
+
+/** ビッグファイブ 5 軸の出力レベル(`low` / `mid` / `high`)。 */
+export type BigFiveLevel = "low" | "mid" | "high";
+
+/**
+ * MINDSET v2 の進路文脈回答からビッグファイブ 5 軸を `low` / `mid` / `high` で
+ * 暗黙的に推定する(specs §7-1-1)。
+ *
+ * 設計方針:
+ * - 各軸は複数質問の **組み合わせ** で判定する(単一質問では断定しない)。
+ * - 「明確な high」「明確な low」が成立しない場合はすべて `mid`(中庸)に倒す。
+ * - `neither` 値(unknown_field_jump / competition_pref / failure_recovery)は
+ *   中庸入力として扱い、両極の `high` / `low` 判定の根拠にしない。
+ *
+ * 制約:
+ * - ユーザーには軸名(外向性等)を一切表示しない(§7-1-2 prompt 側で明文)。
+ * - AI は本値を「進路提案の参考シグナル」として使う(性格断定ではなく)。
+ */
+export function inferBigFive(a: AnswerMap): {
+  extraversion: BigFiveLevel;
+  agreeableness: BigFiveLevel;
+  conscientiousness: BigFiveLevel;
+  neuroticism: BigFiveLevel;
+  openness: BigFiveLevel;
+} {
+  // 外向性 = leadership_role + social_pref
+  // 高: lead_want and team_strong / 低: lead_avoid and solo_strong / それ以外: mid
+  const extraversion: BigFiveLevel =
+    a.leadership_role === "lead_want" && a.social_pref === "team_strong"
+      ? "high"
+      : a.leadership_role === "lead_avoid" && a.social_pref === "solo_strong"
+        ? "low"
+        : "mid";
+
+  // 協調性 = social_pref + competition_pref(逆向き)
+  // 高: team_strong and compete_drain / 低: compete_motivated and solo_strong / それ以外: mid
+  // competition_pref=neither は中庸入力(片方の極端判定の根拠にしない)
+  const agreeableness: BigFiveLevel =
+    a.social_pref === "team_strong" && a.competition_pref === "compete_drain"
+      ? "high"
+      : a.competition_pref === "compete_motivated" &&
+          a.social_pref === "solo_strong"
+        ? "low"
+        : "mid";
+
+  // 誠実性 = plan_style + learning_depth
+  // 高: plan_first and deep_focus / 低: action_first and wide_explore / それ以外: mid
+  const conscientiousness: BigFiveLevel =
+    a.plan_style === "plan_first" && a.learning_depth === "deep_focus"
+      ? "high"
+      : a.plan_style === "action_first" && a.learning_depth === "wide_explore"
+        ? "low"
+        : "mid";
+
+  // 神経症傾向 = unknown_field_jump + failure_recovery + risk_pref(逆向き)
+  // 高: jump_anxious and careful_after and safe
+  // 低: jump_ok and retry_fast and risk_take
+  // どちらの極にも該当しない(neither を含む)→ mid
+  const neuroticism: BigFiveLevel =
+    a.unknown_field_jump === "jump_anxious" &&
+    a.failure_recovery === "careful_after" &&
+    a.risk_pref === "safe"
+      ? "high"
+      : a.unknown_field_jump === "jump_ok" &&
+          a.failure_recovery === "retry_fast" &&
+          a.risk_pref === "risk_take"
+        ? "low"
+        : "mid";
+
+  // 開放性 = change_attitude + learning_depth
+  // 高: change_welcome and (wide_explore or mix_learning)
+  // 低: change_dislike and deep_focus
+  const openness: BigFiveLevel =
+    a.change_attitude === "change_welcome" &&
+    (a.learning_depth === "wide_explore" ||
+      a.learning_depth === "mix_learning")
+      ? "high"
+      : a.change_attitude === "change_dislike" &&
+          a.learning_depth === "deep_focus"
+        ? "low"
+        : "mid";
+
+  return {
+    extraversion,
+    agreeableness,
+    conscientiousness,
+    neuroticism,
+    openness,
+  };
+}
+
+/** MINDSET コア性格群の回答が 1 つでも入っているか(BF サマリ注入のトリガ)。 */
+function hasAnyMindsetCore(a: AnswerMap): boolean {
+  const coreIds = [
+    "leadership_role",
+    "social_pref",
+    "plan_style",
+    "unknown_field_jump",
+    "change_attitude",
+    "competition_pref",
+    "risk_pref",
+    "learning_depth",
+    "failure_recovery",
+  ];
+  return coreIds.some((id) => typeof a[id] === "string" && a[id] !== "");
+}
 
 /** ORIGIN の current_income と GOAL の goal_income の対比から年収トレンドを判定する。 */
 function computeIncomeTrend(answers: AnswerMap): string | null {

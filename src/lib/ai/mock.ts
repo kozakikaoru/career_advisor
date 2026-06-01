@@ -398,17 +398,30 @@ function buildCandidates(goalLabel: string) {
 function pickStrengths(answers: AnswerMap): string[] {
   const base = ["継続力", "学ぶ意欲", "素直さ"];
   const add: string[] = [];
-  if (strOf(answers.work_style_pref) === "deep") add.push("探究心");
-  if (strOf(answers.work_style_pref) === "wide") add.push("好奇心");
-  if (strOf(answers.social_pref) === "team") add.push("協調性");
-  if (strOf(answers.social_pref) === "solo") add.push("集中力");
-  if (strOf(answers.risk_pref) === "risk") add.push("挑戦心");
+  // MINDSET v2 確定版: learning_depth(旧 work_style_pref 改名)/ 3 択化された social_pref / risk_pref を使う。
+  const ld = strOf(answers.learning_depth);
+  if (ld === "deep_focus") add.push("探究心");
+  if (ld === "wide_explore") add.push("好奇心");
+  const sp = strOf(answers.social_pref);
+  if (sp === "team_strong") add.push("協調性");
+  if (sp === "solo_strong") add.push("集中力");
+  const rp = strOf(answers.risk_pref);
+  if (rp === "risk_take") add.push("挑戦心");
+  // value_priority は multi(1〜3 個)。代表選択から派生強み。
+  const vp = answers.value_priority;
+  if (Array.isArray(vp)) {
+    if (vp.includes("growth")) add.push("向上心");
+    if (vp.includes("meaning")) add.push("使命感");
+    if (vp.includes("freedom")) add.push("自律性");
+  }
   return [...add, ...base].slice(0, 5).map((s) => clamp(s, 20));
 }
 
 function buildPersonality(answers: AnswerMap): CareerPlan["personality"] {
-  const deep = strOf(answers.work_style_pref) === "deep";
-  const team = strOf(answers.social_pref) === "team";
+  // MINDSET v2 確定版: learning_depth(旧 work_style_pref 改名)で「探究/拡張」を判定。
+  // social_pref / risk_pref は 3 択化されたので team_strong / safe で判定。
+  const deep = strOf(answers.learning_depth) === "deep_focus";
+  const team = strOf(answers.social_pref) === "team_strong";
   const safe = strOf(answers.risk_pref) === "safe";
 
   const typeName = deep ? "探究型ビルダー" : "拡張型チャレンジャー";
