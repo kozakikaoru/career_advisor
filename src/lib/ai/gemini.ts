@@ -47,6 +47,11 @@ export class GeminiProvider implements AIProvider {
               responseMimeType: "application/json",
               responseSchema: GEMINI_RESPONSE_SCHEMA,
               temperature: 0.7,
+              // 3 案 × 各 plan(roadmap 最大 8 段 + skills 等)で出力サイズが大きい。
+              // maxOutputTokens を明示し、さらに thinkingBudget=0 で
+              // 思考フェーズを切って応答時間を短縮する(60s の Vercel maxDuration 内に収めるため)。
+              maxOutputTokens: 8192,
+              thinkingConfig: { thinkingBudget: 0 },
             },
           }),
           timeoutMs,
@@ -59,6 +64,14 @@ export class GeminiProvider implements AIProvider {
         lastError = "schema_validation_failed";
       } catch (e) {
         lastError = e instanceof Error ? e.name : "request_failed";
+        // Gemini からのエラー詳細をログに出す。Gemini SDK のエラーメッセージ自体は API 側の
+        // 障害種別(timeout / quota / schema 違反等)で、ユーザー回答本文は含まない。
+        // 運用時は本ログから ApiError code(429 / 400 等)を見て対応する。
+        if (e instanceof Error) {
+          console.error(
+            `[gemini] attempt=${attempt} name=${e.name} msg=${e.message.slice(0, 600)}`,
+          );
+        }
       }
     }
     throw new Error(`AI 出力の検証に失敗しました (${lastError})`);
@@ -96,13 +109,18 @@ export function safeJsonParse(raw: string): unknown {
 // Gemini 構造化出力用スキーマ(CareerPlanSchema v2 と一致させる・ai-layer.md §3)
 // ============================================================
 
+// 2026-06-02: schema 簡素化 — string の min/maxLength と array の min/maxItems を撤去。
+// 件数・長さの上下限は prompt 文と Zod 側で担保する(Gemini 「too many states」エラー回避)。
+// enum / required / matchPercent の int 範囲(0..100)など、Gemini の構造誘導に必要な
+// 軽い制約は残す。
+
 const ROADMAP_NODE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    timeLabel: { type: Type.STRING, maxLength: "12" },
-    periodText: { type: Type.STRING, maxLength: "20" },
-    title: { type: Type.STRING, maxLength: "40" },
-    description: { type: Type.STRING, minLength: "40", maxLength: "220" },
+    timeLabel: { type: Type.STRING },
+    periodText: { type: Type.STRING },
+    title: { type: Type.STRING },
+    description: { type: Type.STRING },
     kind: {
       type: Type.STRING,
       format: "enum",
@@ -110,9 +128,7 @@ const ROADMAP_NODE_SCHEMA: Schema = {
     },
     nowActions: {
       type: Type.ARRAY,
-      minItems: "1",
-      maxItems: "3",
-      items: { type: Type.STRING, maxLength: "160" },
+      items: { type: Type.STRING },
     },
   },
   required: ["timeLabel", "periodText", "title", "description", "kind"],
@@ -121,16 +137,16 @@ const ROADMAP_NODE_SCHEMA: Schema = {
 const PLAN_CANDIDATE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    title: { type: Type.STRING, maxLength: "40" },
-    shortSummary: { type: Type.STRING, maxLength: "60" },
-    detail: { type: Type.STRING, minLength: "120", maxLength: "220" },
+    title: { type: Type.STRING },
+    shortSummary: { type: Type.STRING },
+    detail: { type: Type.STRING },
     matchPercent: { type: Type.INTEGER, minimum: 0, maximum: 100 },
     feasibility: {
       type: Type.STRING,
       format: "enum",
       enum: ["realistic", "challenging", "very_challenging", "extreme_effort"],
     },
-    warning: { type: Type.STRING, maxLength: "160" },
+    warning: { type: Type.STRING },
     isTop: { type: Type.BOOLEAN },
   },
   required: ["title", "shortSummary", "detail", "matchPercent", "feasibility"],
@@ -141,34 +157,26 @@ const PLAN_SKILLS_SCHEMA: Schema = {
   properties: {
     mustLearn: {
       type: Type.ARRAY,
-      minItems: "0",
-      maxItems: "8",
       items: {
         type: Type.OBJECT,
         properties: {
-          title: { type: Type.STRING, maxLength: "40" },
-          description: { type: Type.STRING, maxLength: "120" },
+          title: { type: Type.STRING },
+          description: { type: Type.STRING },
         },
         required: ["title", "description"],
       },
     },
     emergingSkills: {
       type: Type.ARRAY,
-      minItems: "1",
-      maxItems: "4",
-      items: { type: Type.STRING, maxLength: "40" },
+      items: { type: Type.STRING },
     },
     recommendedCerts: {
       type: Type.ARRAY,
-      minItems: "0",
-      maxItems: "3",
-      items: { type: Type.STRING, maxLength: "40" },
+      items: { type: Type.STRING },
     },
     strengths: {
       type: Type.ARRAY,
-      minItems: "2",
-      maxItems: "5",
-      items: { type: Type.STRING, maxLength: "20" },
+      items: { type: Type.STRING },
     },
   },
   required: ["mustLearn", "emergingSkills", "recommendedCerts", "strengths"],
@@ -182,10 +190,10 @@ const AD_SLOT_SCHEMA: Schema = {
       format: "enum",
       enum: ["ad_recruitment", "affiliate"],
     },
-    headline: { type: Type.STRING, maxLength: "80" },
-    body: { type: Type.STRING, maxLength: "160" },
-    ctaLabel: { type: Type.STRING, maxLength: "40" },
-    ctaUrl: { type: Type.STRING, maxLength: "300" },
+    headline: { type: Type.STRING },
+    body: { type: Type.STRING },
+    ctaLabel: { type: Type.STRING },
+    ctaUrl: { type: Type.STRING },
   },
   required: ["kind"],
 };
@@ -211,8 +219,6 @@ const PLAN_SCHEMA: Schema = {
     candidate: PLAN_CANDIDATE_SCHEMA,
     roadmap: {
       type: Type.ARRAY,
-      minItems: "3",
-      maxItems: "8",
       items: ROADMAP_NODE_SCHEMA,
     },
     skills: PLAN_SKILLS_SCHEMA,
@@ -221,51 +227,33 @@ const PLAN_SCHEMA: Schema = {
   required: ["planType", "candidate", "roadmap", "skills", "adSlot"],
 };
 
+// 2026-06-02: PersonalityType 撤去(Gemini 502 対応の prompt/schema 簡素化)。
+// `personality` プロパティは responseSchema からも削除。required からも外す。
+//
+// 同日: Gemini が返してきた INVALID_ARGUMENT
+// "The specified schema produces a constraint that has too many states for serving"
+// 対応として、string の minLength / maxLength と array の minItems / maxItems を
+// responseSchema から撤去。長さ・件数制約は prompt 文と Zod 側で担保する設計に切替。
+// (`enum` / `required` / `Type.INTEGER minimum/maximum` のような軽い制約は残せる。)
 const GEMINI_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
     hero: {
       type: Type.OBJECT,
       properties: {
-        tagline: { type: Type.STRING, minLength: "8", maxLength: "40" },
-        durationText: { type: Type.STRING, maxLength: "20" },
-        summary: { type: Type.STRING, minLength: "80", maxLength: "180" },
-        currentLabel: { type: Type.STRING, maxLength: "40" },
-        goalLabel: { type: Type.STRING, maxLength: "40" },
+        tagline: { type: Type.STRING },
+        durationText: { type: Type.STRING },
+        summary: { type: Type.STRING },
+        currentLabel: { type: Type.STRING },
+        goalLabel: { type: Type.STRING },
       },
       required: ["tagline", "durationText", "summary"],
     },
-    personality: {
-      type: Type.OBJECT,
-      properties: {
-        typeName: { type: Type.STRING, maxLength: "20" },
-        emoji: { type: Type.STRING, maxLength: "4" },
-        summary: { type: Type.STRING, maxLength: "220" },
-        traits: {
-          type: Type.ARRAY,
-          minItems: "2",
-          maxItems: "4",
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              label: { type: Type.STRING, maxLength: "16" },
-              level: { type: Type.INTEGER, minimum: 0, maximum: 100 },
-              comment: { type: Type.STRING, maxLength: "12" },
-            },
-            required: ["label", "level", "comment"],
-          },
-        },
-      },
-      required: ["typeName", "emoji", "summary", "traits"],
-    },
     plans: {
-      // tuple([Plan, Plan, Plan]) は Gemini Schema に直接対応がないため、
-      // minItems / maxItems = 3 で固定長を表現する。zod 側で最終検証(length===3)を担保。
+      // plans の固定長 3 は prompt と Zod で担保(tuple)。
       type: Type.ARRAY,
-      minItems: "3",
-      maxItems: "3",
       items: PLAN_SCHEMA,
     },
   },
-  required: ["hero", "personality", "plans"],
+  required: ["hero", "plans"],
 };
