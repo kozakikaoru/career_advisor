@@ -14,6 +14,13 @@ import { z } from "zod";
  * - `RoadmapNode.nowActions` を NOW ノード用に新設(§3-6-2)
  * - 旧 `roadmap`(単数) / `candidates`(配列) / `skills.learning` / `nextAction` は完全撤去
  *
+ * 2026-06-02 PersonalityType 撤去(@engineer):
+ * - Gemini 2.5 Flash で 502 が頻発する課題への対応として `personality` セクション
+ *   (PersonalitySchema / TraitSchema)を CareerPlan の必須キーから撤去。
+ *   prompt 長削減 + responseSchema 単純化が目的。
+ * - MINDSET 回答自体は引き続き `inferBigFive` 経由で AI 入力には使う(進路提案には反映)。
+ * - 型 export と TraitSchema/PersonalitySchema 定義は将来復活に備えて残置(unused 扱い)。
+ *
  * 後方互換性: ゼロ(過去結果は削除する方針・specs §2-5 / §8-6)。
  */
 
@@ -121,7 +128,12 @@ export const PlanSchema = z.object({
   adSlot: AdSlotSchema,
 });
 
-/** タイプ分析の指標(バー) */
+/**
+ * タイプ分析の指標(バー)
+ *
+ * 2026-06-02: PersonalityType 撤去に伴い CareerPlanSchema からは参照されなくなったが、
+ * 将来復活する可能性に備えて型定義は残置(unused)。
+ */
 export const TraitSchema = z.object({
   label: z.string().min(1).max(16), // 例: "探究心"
   level: z.number().int().min(0).max(100), // バー幅
@@ -142,7 +154,12 @@ export const HeroSchema = z.object({
   goalLabel: z.string().min(1).max(40).optional(),
 });
 
-/** パーソナリティタイプ(全案共通) */
+/**
+ * パーソナリティタイプ(全案共通)
+ *
+ * 2026-06-02: PersonalityType 撤去に伴い CareerPlanSchema からは参照されなくなったが、
+ * 将来復活する可能性に備えて型定義は残置(unused)。
+ */
 export const PersonalitySchema = z.object({
   typeName: z.string().min(1).max(20), // 例: "探究型ビルダー"
   emoji: z.string().min(1).max(4), // 例: "🦉"
@@ -150,12 +167,15 @@ export const PersonalitySchema = z.object({
   traits: z.array(TraitSchema).min(2).max(4),
 });
 
-/** v2 トップレベルスキーマ */
+/**
+ * v2 トップレベルスキーマ
+ *
+ * 2026-06-02: `personality` キーを撤去(Gemini 502 対応の prompt/schema 簡素化)。
+ * MINDSET 回答は AI 入力としては引き続き利用(進路提案に暗黙反映)。
+ */
 export const CareerPlanSchema = z.object({
   /** 全案共通の Hero(tagline / 期間 / サマリ) */
   hero: HeroSchema,
-  /** 全案共通の PersonalityType */
-  personality: PersonalitySchema,
   /** 3 本のプラン(固定長 3・specs §1-4 / §2-2) */
   plans: z.tuple([PlanSchema, PlanSchema, PlanSchema]),
 });

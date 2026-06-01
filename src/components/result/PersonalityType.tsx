@@ -1,12 +1,19 @@
-import type { CareerPlan } from "@/lib/schema/result";
+import type { Personality } from "@/lib/schema/result";
 
 const BARS = ["bar", "bar2", "bar3", "bar"];
 
-/** E. タイプ分析(タイプ名 + 指標バー) */
+/**
+ * E. タイプ分析(タイプ名 + 指標バー)
+ *
+ * 2026-06-02: Gemini 502 対応のため `CareerPlan` から `personality` フィールドを撤去。
+ *   本コンポーネントは ResultView から参照されなくなったが、将来復活時に再利用するため
+ *   ファイル自体は残置(Personality 型を直接受け取る形に変更)。現状の Plan 説明文・skills
+ *   側に「進路文脈の言葉」で性格傾向が滲ませてある(prompt.ts MINDSET 解釈ガイド経由)。
+ */
 export function PersonalityType({
   personality,
 }: {
-  personality: CareerPlan["personality"];
+  personality: Personality;
 }) {
   return (
     <div className="glow-card rounded-2xl p-6 sm:p-7">

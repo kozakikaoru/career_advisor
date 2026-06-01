@@ -7,7 +7,6 @@ import { Logo } from "@/components/ui/Logo";
 import { ResultHero } from "./ResultHero";
 import { PlanTabs } from "./PlanTabs";
 import { PlanContent } from "./PlanContent";
-import { PersonalityType } from "./PersonalityType";
 import { ShareUrl } from "./ShareUrl";
 
 /**
@@ -15,7 +14,11 @@ import { ShareUrl } from "./ShareUrl";
  *
  * 構造:
  *   Hero(共通) → Tabs → 選択中の Plan(CandidateHeader → Roadmap → Skills → AdSlot)
- *   → PersonalityType(共通) → ShareUrl + 免責
+ *   → ShareUrl + 免責
+ *
+ * 2026-06-02 PersonalityType セクション撤去(Gemini 502 対応):
+ *   prompt/responseSchema の単純化のため、結果画面の PersonalityType ブロックを撤去。
+ *   MINDSET の回答自体は AI 入力に渡り、各 Plan の説明やロードマップに反映される。
  *
  * タブ状態は useState で管理(クライアントコンポーネント)。
  * 初期表示は plans[0]、ただし isTop=true が他にあればそれを優先。
@@ -56,11 +59,6 @@ export function ResultView({ plan, url }: { plan: CareerPlan; url: string }) {
         <div key={activeIndex} className="rise">
           <PlanContent plan={activePlan} index={activeIndex} />
         </div>
-
-        {/* 全案共通の PersonalityType(タブ外・最下部) */}
-        <section className="mt-12 mb-10">
-          <PersonalityType personality={plan.personality} />
-        </section>
       </main>
 
       {/* Save / Share + 免責 */}

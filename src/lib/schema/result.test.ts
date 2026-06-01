@@ -10,6 +10,9 @@ import {
 
 /**
  * CareerPlanSchema v2 のバリデーション確認(specs/result-v2.md §2)。
+ *
+ * 2026-06-02: PersonalityType 撤去(Gemini 502 対応)に伴い `personality` キーを
+ * CareerPlan の必須から外した。本ファイルの正常系/異常系もそれに追従。
  */
 
 // ============================================================
@@ -91,19 +94,8 @@ const validHero = {
   ),
 };
 
-const validPersonality = {
-  typeName: "探究型ビルダー",
-  emoji: "🦉",
-  summary: "「なぜ」を突き詰めながら手も動かせるタイプ。",
-  traits: [
-    { label: "探究心", level: 88, comment: "とても高い" },
-    { label: "慎重さ", level: 72, comment: "高い" },
-  ],
-};
-
 const validCareerPlan = {
   hero: validHero,
-  personality: validPersonality,
   plans: [validPlan, validPlan, validPlan] as const,
 };
 
@@ -146,10 +138,41 @@ describe("CareerPlanSchema v2 — トップレベル", () => {
       ],
       skills: { learning: ["A", "B"], strengths: ["継続力"] },
       nextAction: { title: "最初の一歩", detail: "..." },
-      personality: validPersonality,
     };
     const r = CareerPlanSchema.safeParse(v1Plan);
     expect(r.success).toBe(false);
+  });
+
+  it("personality キーは廃止(2026-06-02 Gemini 502 対応・撤去確認)", () => {
+    // 正常データ(hero + plans のみ)で parse 成功
+    const r = CareerPlanSchema.safeParse(validCareerPlan);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      // 型レベルでも personality が含まれていないことを担保
+      expect("personality" in r.data).toBe(false);
+    }
+  });
+
+  it("personality キーを含めて投げても、余剰プロパティとして無視される(zod 既定: passthrough off)", () => {
+    // zod のオブジェクトスキーマは既定で「strip(余剰キーは破棄)」のため、personality を
+    // 付けた past-format も parse 自体は成功する(出力からは脱落)。
+    const withLegacy = {
+      ...validCareerPlan,
+      personality: {
+        typeName: "探究型ビルダー",
+        emoji: "🦉",
+        summary: "サマリ",
+        traits: [
+          { label: "探究心", level: 80, comment: "高い" },
+          { label: "慎重さ", level: 60, comment: "中程度" },
+        ],
+      },
+    };
+    const r = CareerPlanSchema.safeParse(withLegacy);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect("personality" in r.data).toBe(false);
+    }
   });
 });
 

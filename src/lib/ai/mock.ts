@@ -52,7 +52,6 @@ export class MockProvider implements AIProvider {
         currentLabel,
         goalLabel,
       },
-      personality: buildPersonality(answers),
       plans,
     };
 
@@ -688,24 +687,5 @@ function pickStrengths(answers: AnswerMap): string[] {
   return merged.slice(0, 5);
 }
 
-function buildPersonality(answers: AnswerMap): CareerPlan["personality"] {
-  const deep = strOf(answers.learning_depth) === "deep_focus";
-  const team = strOf(answers.social_pref) === "team_strong";
-  const safe = strOf(answers.risk_pref) === "safe";
-
-  const typeName = deep ? "探究型ビルダー" : "拡張型チャレンジャー";
-  const emoji = deep ? "🦉" : "🚀";
-
-  return {
-    typeName,
-    emoji,
-    summary: deep
-      ? "「なぜ」を突き詰めながら手も動かせるタイプ。明確な地図のある長距離走で力を発揮します。"
-      : "新しいことに次々挑むタイプ。変化の多い環境で実験を重ねながら道を切り拓きます。",
-    traits: [
-      { label: "探究心", level: deep ? 88 : 70, comment: deep ? "とても高い" : "高い" },
-      { label: "慎重さ", level: safe ? 78 : 52, comment: safe ? "やや高い" : "中程度" },
-      { label: "協調性", level: team ? 80 : 58, comment: team ? "高い" : "中程度" },
-    ],
-  };
-}
+// 2026-06-02 PersonalityType 撤去(Gemini 502 対応)に伴い buildPersonality() は撤去済み。
+// strengths は skills.strengths(進路文脈の「うっすら」表現)として MINDSET 回答から生成する(pickStrengths)。

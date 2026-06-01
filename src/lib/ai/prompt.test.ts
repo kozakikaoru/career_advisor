@@ -332,6 +332,17 @@ describe("buildPrompt — 結果 v2 / 3 案出力ガイド(specs/result-v2.md §
     expect(p).toContain("hero.tagline");
     expect(p).toContain("ad_recruitment");
   });
+
+  it("2026-06-02 PersonalityType 撤去: personality キーが出力制約に含まれない", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    // 出力トップレベルは hero / plans の 2 キーのみ
+    expect(p).toContain("hero / plans の 2 キーを必ず含める");
+    // personality.traits の指示が出ていない
+    expect(p).not.toContain("personality.traits");
+    expect(p).not.toContain("typeName");
+    // hero / personality / plans の 3 キーという旧表記が残っていない
+    expect(p).not.toContain("hero / personality / plans");
+  });
 });
 
 // ============================================================
@@ -514,30 +525,27 @@ describe("buildPrompt — MINDSET v2 プロンプト整形ガイド(specs §8-5-
     expect(p).toContain(`- 開放性: ${bf.openness}`);
   });
 
-  it("(m-2) 軸名を結果画面に直接出さない制約が含まれる(§7-1-2)", () => {
-    const p = buildPrompt(baseMindset);
-    expect(p).toContain("直接的な性格断定をしない");
-    expect(p).toContain("ビッグファイブの軸名");
-    expect(p).toContain("結果画面に出さない");
-  });
-
   it("(m-2) neither を「明確な傾向なし・中庸」として扱う指示が含まれる(§1-2-1)", () => {
     const p = buildPrompt(baseMindset);
     expect(p).toContain("neither");
     expect(p).toContain("中庸");
   });
 
-  it("(m-2-§7-1-3) 進路文脈の「うっすら」表現ガイドが含まれる(具体例 + NG 表現)", () => {
+  it("(m-2) 性格断定回避・軸名を結果画面に出さない指針が残っている(撤去後も Plan 説明への滲み出し対策)", () => {
+    // 2026-06-02 PersonalityType セクション撤去後も、各 Plan の説明文に
+    // 軸名やスコアが滲み出ないようにする指針は維持。
     const p = buildPrompt(baseMindset);
-    // 結果画面冒頭の傾向セクションのガイド
-    expect(p).toContain("結果画面冒頭");
-    expect(p).toContain("「あなたの傾向」");
-    // 具体例 5 個のうち少なくとも 3 個は明文
-    expect(p).toContain("挑戦志向タイプ");
-    expect(p).toContain("計画的に積み上げるタイプ");
-    expect(p).toContain("探索型タイプ");
-    // NG 表現の明示
     expect(p).toContain("MBTI");
+    expect(p).toContain("ビッグファイブの軸名");
+    // 「進路文脈の言葉で柔らかく」のような語が残っていることを確認
+    expect(p).toContain("進路文脈");
+  });
+
+  it("2026-06-02 撤去: §7-1-3 結果画面冒頭の「あなたの傾向」セクション出力指示は prompt に含まれない", () => {
+    const p = buildPrompt(baseMindset);
+    // PersonalityType 撤去に伴い、結果画面冒頭の「あなたの傾向」セクションは廃止
+    expect(p).not.toContain("結果画面冒頭");
+    expect(p).not.toContain("「あなたの傾向」");
   });
 
   it("(m-3) 性格傾向 × 案タイプの対応ガイドが含まれる(§7-2-1)", () => {
@@ -576,13 +584,10 @@ describe("buildPrompt — MINDSET v2 プロンプト整形ガイド(specs §8-5-
 
   it("(m-2 否定) 結果画面で軸名を直接出すよう AI に指示していない(NG 文言が prompt 自体に推奨形で出ない)", () => {
     const p = buildPrompt(baseMindset);
-    // NG 表現の「あなたは外向性が高いです」は引用形式で禁止されていることを担保。
-    // 一方、prompt 自体は「ビッグファイブの軸名を結果画面に出さない」と書いているので、
-    // 「軸名」「外向性」が含まれること自体は OK(指示文として)。
-    // ここでは「結果画面に出さない」「直接的な性格断定をしない」「軸名」のような禁止文脈が
-    // 一貫していることだけ確認。
+    // 2026-06-02 PersonalityType 撤去後も、各 Plan の説明文に軸名・スコアが滲み出ないよう
+    // 注意喚起する語(「ビッグファイブの軸名」「出力しないこと」または同等表現)が残っていることを確認。
     expect(p).toContain("ビッグファイブの軸名");
-    expect(p).toContain("結果画面に出さない");
+    expect(p).toMatch(/出力しないこと|出さないこと|出さない/);
   });
 });
 
