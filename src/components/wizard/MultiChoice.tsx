@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Choice } from "@/lib/questions/definitions";
 
 /**
@@ -26,6 +26,8 @@ export function MultiChoice({
   const [toast, setToast] = useState<string | null>(null);
   // useEffect の cleanup でタイマー破棄するため、ref で保持
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 各選択肢の description 要素に紐付ける ID プレフィックス(aria-describedby 用)
+  const idPrefix = useId();
 
   // アンマウント時にタイマーを掃除
   useEffect(() => {
@@ -61,12 +63,17 @@ export function MultiChoice({
       <div className="grid sm:grid-cols-2 gap-3" role="group">
         {choices.map((c) => {
           const selected = value.includes(c.value);
+          // MINDSET v2(2026-06-02)で導入した description を優先。hint も同じ位置に
+          // 表示するが、両方ある場合は description を採用(運用上重複させない)。
+          const sub = c.description ?? c.hint;
+          const descId = sub ? `${idPrefix}-${c.value}-desc` : undefined;
           return (
             <button
               key={c.value}
               type="button"
               role="checkbox"
               aria-checked={selected}
+              aria-describedby={descId}
               onClick={() => toggle(c.value)}
               className={`text-left rounded-2xl border px-5 py-4 transition ${
                 selected
@@ -98,6 +105,11 @@ export function MultiChoice({
                 </span>
                 <span className="font-medium text-sm">{c.label}</span>
               </div>
+              {sub && (
+                <p id={descId} className="text-xs text-mute mt-1.5 pl-7">
+                  {sub}
+                </p>
+              )}
             </button>
           );
         })}
