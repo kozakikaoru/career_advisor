@@ -19,7 +19,20 @@ export interface Choice {
   label: string;
   /** 任意: この選択肢を選んだら次に飛ぶ質問 ID(分岐) */
   next?: string;
-  /** 任意: 選択肢の補足説明 */
+  /**
+   * 任意: 選択肢の補足説明(短文・例示や境界条件)。
+   *
+   * 歴史的経緯: 当初 ORIGIN/GOAL 系で「hint」として導入し、選択肢ラベルの下に
+   * 小さく表示してきた。MINDSET v2(2026-06-02)で同じ役割を「description」として
+   * 再定義(かおる依頼書 Phase 1)。**意味的には hint と等価**だが、命名揺れを
+   * 避けるため新規追加分は description を使う。
+   * - レンダリング: SingleChoice / MultiChoice が hint と同じ位置・スタイルで表示
+   *   (text-mute / text-xs)。aria-describedby で関連付ける。
+   * - hint と description が両方指定された場合は **description を優先**(表示の
+   *   重複を避ける運用 / 同一選択肢で両方を埋めない前提)。
+   */
+  description?: string;
+  /** 任意: 選択肢の補足説明(旧称・description と同義。互換のため残置) */
   hint?: string;
 }
 
@@ -101,7 +114,7 @@ export const QUESTIONS: Question[] = [
     id: "stage",
     axis: "current",
     type: "single",
-    title: "今の主な活動・立場は?",
+    title: "今の主な活動・立場は？",
     description:
       "いまの生活で一番時間を使っているものに近いものを選んでください。希望や意向ではなく今の事実で選んでください。",
     required: true,
@@ -171,7 +184,7 @@ export const QUESTIONS: Question[] = [
     id: "school_type",
     axis: "current",
     type: "single",
-    title: "どの学校に通っていますか?",
+    title: "どの学校に通っていますか？",
     description: "進路設計の起点になります。",
     required: true,
     choices: [
@@ -190,7 +203,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_jh",
     axis: "current",
     type: "single",
-    title: "何年生ですか?",
+    title: "何年生ですか？",
     required: true,
     choices: [
       { value: "jh1_2", label: "1〜2年" },
@@ -204,7 +217,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_hs",
     axis: "current",
     type: "single",
-    title: "何年生ですか?",
+    title: "何年生ですか？",
     required: true,
     choices: [
       { value: "hs1", label: "1年" },
@@ -219,7 +232,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_voc",
     axis: "current",
     type: "single",
-    title: "何年次ですか?",
+    title: "何年次ですか？",
     required: true,
     choices: [
       { value: "voc1", label: "1年" },
@@ -235,7 +248,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_kosen",
     axis: "current",
     type: "single",
-    title: "何年生ですか?",
+    title: "何年生ですか？",
     required: true,
     choices: [
       { value: "kosen_low", label: "1〜3年(本科)" },
@@ -250,7 +263,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_jcol",
     axis: "current",
     type: "single",
-    title: "何年生ですか?",
+    title: "何年生ですか？",
     required: true,
     choices: [
       { value: "jcol1", label: "1年" },
@@ -264,7 +277,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_uni",
     axis: "current",
     type: "single",
-    title: "何年生ですか?",
+    title: "何年生ですか？",
     required: true,
     choices: [
       { value: "u1", label: "1年" },
@@ -281,7 +294,7 @@ export const QUESTIONS: Question[] = [
     id: "grade_grad",
     axis: "current",
     type: "single",
-    title: "修士・博士のどちらですか?",
+    title: "修士・博士のどちらですか？",
     required: true,
     choices: [
       { value: "m1", label: "修士1年" },
@@ -311,7 +324,7 @@ export const QUESTIONS: Question[] = [
     id: "student_work_exp",
     axis: "current",
     type: "multi",
-    title: "実務に近い経験はありますか?(複数選択可)",
+    title: "実務に近い経験はありますか？(複数選択可)",
     description: "学業以外で社会との接点になった経験を選んでください。",
     required: true,
     choices: [
@@ -359,7 +372,7 @@ export const QUESTIONS: Question[] = [
     id: "employment_type",
     axis: "current",
     type: "single",
-    title: "雇用形態は?",
+    title: "雇用形態は？",
     required: true,
     choices: [
       { value: "fulltime", label: "正社員" },
@@ -385,7 +398,7 @@ export const QUESTIONS: Question[] = [
     id: "prior_work_exp",
     axis: "current",
     type: "single",
-    title: "これまでに働いた経験はありますか?",
+    title: "これまでに働いた経験はありますか？",
     description:
       "正社員に限らず、契約・派遣・アルバイト・副業・専業時代の経験も含めて構いません。",
     required: true,
@@ -416,7 +429,7 @@ export const QUESTIONS: Question[] = [
     id: "years_employed",
     axis: "current",
     type: "single",
-    title: "その分野での経験年数は?",
+    title: "その分野での経験年数は？",
     description:
       "正社員に限らず、契約・派遣・副業・専業時代の経験も含めて構いません。ブランクも含めて通算で。",
     required: true,
@@ -436,7 +449,7 @@ export const QUESTIONS: Question[] = [
     id: "freeter_main_work",
     axis: "current",
     type: "text",
-    title: "主にどんな仕事をしていますか?",
+    title: "主にどんな仕事をしていますか？",
     description:
       "業種・職種を一言で。例: 飲食店ホール、コンビニ、配送、家庭教師 など。",
     placeholder: "例: 飲食店ホール",
@@ -463,7 +476,7 @@ export const QUESTIONS: Question[] = [
     id: "seeking_blank",
     axis: "current",
     type: "single",
-    title: "直近の仕事を離れてからどのくらい経ちますか?",
+    title: "直近の仕事を離れてからどのくらい経ちますか？",
     required: true,
     choices: [
       {
@@ -484,7 +497,7 @@ export const QUESTIONS: Question[] = [
     id: "parental_child_age",
     axis: "current",
     type: "single",
-    title: "一番下のお子さんの年齢に近いのは?",
+    title: "一番下のお子さんの年齢に近いのは？",
     description: "復職タイミングの目安の参考にします。",
     required: true,
     sensitiveNotice: true,
@@ -504,7 +517,7 @@ export const QUESTIONS: Question[] = [
     id: "on_leave_reason",
     axis: "current",
     type: "single",
-    title: "差し支えなければ、休職の主な理由は?",
+    title: "差し支えなければ、休職の主な理由は？",
     description:
       "大まかな種別だけ伺います。具体的な病名・続柄は書く必要はありません。",
     required: true,
@@ -524,7 +537,7 @@ export const QUESTIONS: Question[] = [
     id: "retired_status",
     axis: "current",
     type: "single",
-    title: "現在の状況は?",
+    title: "現在の状況は？",
     required: true,
     choices: [
       { value: "pre", label: "まだ在職中(退職予定)" },
@@ -557,7 +570,7 @@ export const QUESTIONS: Question[] = [
     axis: "current",
     type: "multi",
     title:
-      "これまで学んだ・実務で得た知見のある分野はどれですか?(複数選択可)",
+      "これまで学んだ・実務で得た知見のある分野はどれですか？(複数選択可)",
     description:
       "仕事にできるレベルの知識・経験 がある分野を選んでください(学習中・趣味で軽く触っただけのものは含めない)。AI が提案する進路の足場になります。当てはまるものがなければ「特になし」を選んでください。",
     required: true,
@@ -622,7 +635,7 @@ export const QUESTIONS: Question[] = [
     id: "current_income",
     axis: "current",
     type: "single",
-    title: "現在のおおよその年収帯は?",
+    title: "現在のおおよその年収帯は？",
     description:
       "ロードマップの達成感(現状からの伸びしろ)の参考にします。回答そのものは保存しません。",
     required: true,
@@ -648,7 +661,7 @@ export const QUESTIONS: Question[] = [
     id: "education",
     axis: "current",
     type: "single",
-    title: "最終学歴に近いのは?",
+    title: "最終学歴に近いのは？",
     description:
       "資格や応募要件の参考にします。学歴で進路を決めつけることはしません。",
     required: true,
@@ -668,7 +681,7 @@ export const QUESTIONS: Question[] = [
     id: "life_constraint",
     axis: "current",
     type: "multi",
-    title: "働き方に制約のある状況はありますか?(複数選択可)",
+    title: "働き方に制約のある状況はありますか？(複数選択可)",
     description:
       "ロードマップの現実性(時間・移動可否)の参考にします。具体的な病名・続柄は書かないでください。保存もしません。",
     required: true,
@@ -691,7 +704,7 @@ export const QUESTIONS: Question[] = [
     id: "location",
     axis: "current",
     type: "single",
-    title: "今はどのあたりに住んでいますか?",
+    title: "今はどのあたりに住んでいますか？",
     description:
       "ざっくりした粒度で大丈夫です。具体的な都道府県・地名は聞きません。",
     required: true,
@@ -719,7 +732,7 @@ export const QUESTIONS: Question[] = [
     id: "time_available",
     axis: "current",
     type: "single",
-    title: "キャリアのための学習・準備に使える時間は?",
+    title: "キャリアのための学習・準備に使える時間は？",
     description: "ロードマップの密度を決めるために必須です。",
     required: true,
     choices: [
@@ -800,7 +813,7 @@ export const QUESTIONS: Question[] = [
     id: "change_intent",
     axis: "goal",
     type: "single",
-    title: "今のお仕事(または直近のお仕事)を、これからも続けていきたいですか?",
+    title: "今のお仕事(または直近のお仕事)を、これからも続けていきたいですか？",
     description:
       "ここでは大きな方向だけ伺います。次の質問でもう少し具体的に分岐します。",
     required: true,
@@ -827,7 +840,7 @@ export const QUESTIONS: Question[] = [
     id: "change_direction",
     axis: "goal",
     type: "single",
-    title: "変えたい・迷っている方向はどちらに近いですか?",
+    title: "変えたい・迷っている方向はどちらに近いですか？",
     description:
       "大きな方向を選んでください。両方迷っている場合は「両方迷っている」で OK。",
     required: true,
@@ -860,7 +873,7 @@ export const QUESTIONS: Question[] = [
     id: "step_up_target",
     axis: "goal",
     type: "single",
-    title: "今の分野で、これからどう伸ばしていきたいですか?",
+    title: "今の分野で、これからどう伸ばしていきたいですか？",
     description:
       "専門・人をまとめる・独立・処遇改善 のいずれが近いですか。",
     required: true,
@@ -891,7 +904,7 @@ export const QUESTIONS: Question[] = [
     id: "chg_target_field",
     axis: "goal",
     type: "multi",
-    title: "興味のある分野はどれですか?(複数選択可)",
+    title: "興味のある分野はどれですか？(複数選択可)",
     description:
       "ORIGIN で聞いた「知見のある分野」とは別軸で、これから挑戦したい分野を選んでください。経験ゼロでも構いません。迷っている場合は「未定」を選択。",
     required: true,
@@ -931,7 +944,7 @@ export const QUESTIONS: Question[] = [
     id: "student_goal_track",
     axis: "goal",
     type: "single",
-    title: "卒業後の方向は、どれが一番近いですか?",
+    title: "卒業後の方向は、どれが一番近いですか？",
     description: "いま考えているもので OK。確定していなくても構いません。",
     required: true,
     choices: [
@@ -955,7 +968,7 @@ export const QUESTIONS: Question[] = [
     id: "student_job_status",
     axis: "goal",
     type: "single",
-    title: "就職活動はどのあたりですか?",
+    title: "就職活動はどのあたりですか？",
     description:
       "今の進捗に近いものを一つ選んでください。AI 側で「これから絞り込む段階」「内定持ち」など段階に応じた提案を出し分けます。",
     required: true,
@@ -1000,7 +1013,7 @@ export const QUESTIONS: Question[] = [
     id: "student_advance_status",
     axis: "goal",
     type: "single",
-    title: "進学の準備はどのあたりですか?",
+    title: "進学の準備はどのあたりですか？",
     description:
       "今の進捗に近いものを一つ選んでください。AI 側で「これから志望校を選ぶ段階」「合格・入学確定」など段階に応じた提案を出し分けます。",
     required: true,
@@ -1032,7 +1045,7 @@ export const QUESTIONS: Question[] = [
     id: "student_goal_industry",
     axis: "goal",
     type: "multi",
-    title: "目指したい業界・職種はどれに近いですか?(複数選択可)",
+    title: "目指したい業界・職種はどれに近いですか？(複数選択可)",
     description:
       "ORIGIN で聞いた「知見のある分野」と同じカテゴリ体系で選んでください。複数選択可。当てはまるものがなければ「その他」を選んで次の質問で自由記述してください。迷っている場合は「未定」を選択。進学を選んだ方も、卒業後に進みたい方向で構いません(まだ具体的に決まっていなければ「未定」で OK)。",
     required: true,
@@ -1108,7 +1121,7 @@ export const QUESTIONS: Question[] = [
     id: "new_entry_direction",
     axis: "goal",
     type: "multi",
-    title: "これから働いてみたい分野はどれに近いですか?(複数選択可)",
+    title: "これから働いてみたい分野はどれに近いですか？(複数選択可)",
     description:
       "経験ゼロでも構いません。興味のあるカテゴリを選んでください。迷っている場合は「未定」を選択。",
     required: true,
@@ -1146,7 +1159,7 @@ export const QUESTIONS: Question[] = [
     id: "second_career_intent",
     axis: "goal",
     type: "single",
-    title: "これからのセカンドキャリアでは、どんな方向を考えていますか?",
+    title: "これからのセカンドキャリアでは、どんな方向を考えていますか？",
     description:
       "大きな方向だけ伺います。引退・趣味活動も含めて構いません。",
     required: true,
@@ -1180,7 +1193,7 @@ export const QUESTIONS: Question[] = [
     id: "goal_workstyle",
     axis: "goal",
     type: "multi",
-    title: "希望する働き方の形は?(複数選択可)",
+    title: "希望する働き方の形は？(複数選択可)",
     description:
       "雇用形態についての希望です。複数選択可。「リモート/出社」「ワークライフバランス」など環境面は別の質問(MINDSET)で伺います。",
     required: true,
@@ -1211,7 +1224,7 @@ export const QUESTIONS: Question[] = [
     id: "goal_income",
     axis: "goal",
     type: "single",
-    title: "目指したい年収帯は?",
+    title: "目指したい年収帯は？",
     description:
       "現年収との比較で「現状維持志向」「大幅アップ志向」を判別してロードマップに反映します。「今と同じくらいで OK」は現年収を維持したい方向けです。",
     required: true,
@@ -1238,7 +1251,7 @@ export const QUESTIONS: Question[] = [
     id: "goal_horizon",
     axis: "goal",
     type: "single",
-    title: "目標を実現したい期間はどれくらいですか?",
+    title: "目標を実現したい期間はどれくらいですか？",
     description: "ロードマップの想定期間の目安にします。",
     required: true,
     choices: [
@@ -1259,7 +1272,7 @@ export const QUESTIONS: Question[] = [
     id: "goal_start_timing",
     axis: "goal",
     type: "single",
-    title: "動き出すタイミングは、どれが近いですか?",
+    title: "動き出すタイミングは、どれが近いですか？",
     description:
       "「いつまでに」(前の質問)とは別に、「いつから動き出すか」を伺います。準備期間の設計に使います。学校の入学・卒業・資格取得・育休明けなど、決まったライフイベントを待ってから動き出す方は「数年後(進学卒業・資格取得・育休明けなど準備期間後)」を選んでください。",
     required: true,
@@ -1295,7 +1308,7 @@ export const QUESTIONS: Question[] = [
     id: "goal_commit",
     axis: "goal",
     type: "single",
-    title: "進路実現のために、初期投資としてかけられる金額の目安は?",
+    title: "進路実現のために、初期投資としてかけられる金額の目安は？",
     description:
       "目標に向けた準備期間中の自己投資(教育・ツール・資格・転居等を含めた目安)です。※ あくまで「使える上限の目安」であり、必ず使い切る必要はありません。AI は最終目標の達成に最低限必要な投資だけを提案するため、余裕を持って多めに申告いただいても問題ありません。実際の支払い情報は保存しません。",
     required: true,
@@ -1349,96 +1362,134 @@ export const QUESTIONS: Question[] = [
     id: "leadership_role",
     axis: "personality",
     type: "single",
-    title: "仕事で人をまとめる役は取りたいですか?",
+    title: "仕事で人をまとめる役は取りたいですか？",
     description:
       "「マネジメント / プロジェクトリード / グループの取りまとめ役」のような立場を想定してください。",
     required: true,
     choices: [
       {
         value: "lead_want",
-        label: "取りたい(自分から手を挙げたい)",
+        label: "取りたい",
+        description: "自分から手を挙げたい",
       },
       {
         value: "lead_neutral",
-        label: "必要なら取る(自分から手は挙げないが、頼まれれば引き受ける)",
+        label: "必要なら取る",
+        description: "自分から手は挙げないが、頼まれれば引き受ける",
       },
       {
         value: "lead_avoid",
-        label: "できれば避けたい(個人で動きたい)",
+        label: "できれば避けたい",
+        description: "個人で動きたい",
       },
     ],
     next: "social_pref",
   },
 
   // §3-2. social_pref(チームか一人か)【MUST・A群・3 択 / v1 2 択を拡張】
+  // v2(2026-06-02): 「どちらともいえない」(mix)を末尾へ並び替え + 全角化。
   {
     id: "social_pref",
     axis: "personality",
     type: "single",
-    title: "仕事の進め方として、どちらが力を発揮できますか?",
+    title: "仕事の進め方として、どちらが力を発揮できますか？",
     description:
       "普段の働き方の好みです。「協働 / 集中」の質を知りたいだけで、コミュニケーション能力の高低を問うものではありません。",
     required: true,
     choices: [
       { value: "team_strong", label: "チームで協働しているとき" },
-      { value: "mix", label: "両方(プロジェクトや日によって変えたい)" },
       { value: "solo_strong", label: "一人で集中しているとき" },
+      {
+        value: "mix",
+        label: "どちらともいえない",
+        description: "プロジェクトや日によって変えたい",
+      },
     ],
     next: "plan_style",
   },
 
   // §3-3. plan_style(計画派か行動派か)【MUST・A群・3 択】
+  // v2(2026-06-02): 全角 ?。3 択でも plan_balance が真ん中で自然に成立。
   {
     id: "plan_style",
     axis: "personality",
     type: "single",
-    title: "新しいことを始める時、どちらが近いですか?",
+    title: "新しいことを始める時、どちらが近いですか？",
     description: "キャリアの動き出し方の好みです。",
     required: true,
     choices: [
-      { value: "plan_first", label: "先に計画を立ててから動き出したい" },
-      { value: "plan_balance", label: "計画と行動を行き来したい" },
-      { value: "action_first", label: "まず動いて、走りながら考えたい" },
+      {
+        value: "plan_first",
+        label: "先に計画を立ててから動き出す",
+        description: "計画派",
+      },
+      { value: "plan_balance", label: "計画と行動を行き来する" },
+      {
+        value: "action_first",
+        label: "まず動いて、走りながら考える",
+        description: "行動派",
+      },
     ],
     next: "unknown_field_jump",
   },
 
   // §3-4. unknown_field_jump(未知への飛び込み)【MUST・A群・3 択 / v2 確定版 neither 追加】
+  // v2(2026-06-02): neither を末尾へ並び替え + Choice.description で補足。
   {
     id: "unknown_field_jump",
     axis: "personality",
     type: "single",
-    title: "経験のない業界・職種に飛び込むことに、抵抗はありますか?",
+    title: "経験のない業界・職種に飛び込むことに、抵抗はありますか？",
     description:
       "「飛び込んだことがない」のと「飛び込みたくない」を分けて聞きます。「どちらともいえない」は「テーマや状況による」「強い傾向はない」を意味します(回答保留ではありません)。",
     required: true,
     choices: [
-      { value: "jump_ok", label: "抵抗は少ない(未経験でも興味があれば飛び込める)" },
       {
-        value: "neither",
-        label: "どちらともいえない(テーマや状況による / 強い傾向はない)",
+        value: "jump_ok",
+        label: "抵抗は少ない",
+        description: "未経験でも興味があれば飛び込める",
       },
       {
         value: "jump_anxious",
-        label: "抵抗が強い(できれば経験のある分野で進みたい)",
+        label: "抵抗が強い",
+        description: "できれば経験のある分野で進みたい",
+      },
+      {
+        value: "neither",
+        label: "どちらともいえない",
+        description: "テーマや状況による / 強い傾向はない",
       },
     ],
     next: "change_attitude",
   },
 
   // §3-5. change_attitude(変化への態度)【MUST・A群・3 択】
+  // v2(2026-06-02): 「どちらでもない」→「どちらともいえない」+ 末尾へ並び替え。
+  // value は維持(change_neutral)。
   {
     id: "change_attitude",
     axis: "personality",
     type: "single",
-    title: "仕事や生活で「変化」が起こることに、どう感じますか?",
+    title: "仕事や生活で「変化」が起こることに、どう感じますか？",
     description:
       "制度変更・部署異動・ツール刷新・引っ越し・組織再編 など、外から来る変化を想定してください。",
     required: true,
     choices: [
-      { value: "change_welcome", label: "歓迎する(変化があると面白い)" },
-      { value: "change_neutral", label: "どちらでもない(変化があれば適応する)" },
-      { value: "change_dislike", label: "苦手(なるべく今のままが落ち着く)" },
+      {
+        value: "change_welcome",
+        label: "歓迎する",
+        description: "変化があると面白い",
+      },
+      {
+        value: "change_dislike",
+        label: "苦手",
+        description: "なるべく今のままが落ち着く",
+      },
+      {
+        value: "change_neutral",
+        label: "どちらともいえない",
+        description: "変化があれば適応する",
+      },
     ],
     next: "value_priority",
   },
@@ -1446,6 +1497,7 @@ export const QUESTIONS: Question[] = [
   // §3-6. value_priority(仕事で大事にしたいこと)【MUST・B群・multi MUST 1〜3 個】
   // v1 single → v2 multi 化 + maxSelect 3(かおる論点 v2-2 採択)。
   // Wizard 側で 4 個目選択時にトースト警告 + 選択拒否(specs §8-2-2)。
+  // v2(2026-06-02): 各項目の意味を質問 description から **Choice.description に分離**。
   {
     id: "value_priority",
     axis: "personality",
@@ -1456,161 +1508,220 @@ export const QUESTIONS: Question[] = [
     required: true,
     maxSelect: 3,
     choices: [
-      { value: "stability", label: "安定(雇用・収入・生活の安定)" },
-      { value: "growth", label: "成長・挑戦(スキルや経験を伸ばしたい)" },
-      { value: "freedom", label: "自由・裁量(時間や場所・進め方の自由)" },
-      { value: "relation", label: "人との関わり(同僚・顧客・社会との接点)" },
-      { value: "meaning", label: "社会的意義(役に立っている実感)" },
-      { value: "reward", label: "報酬(対価としての高い収入)" },
+      {
+        value: "stability",
+        label: "安定",
+        description: "雇用・収入・生活の安定",
+      },
+      {
+        value: "growth",
+        label: "成長・挑戦",
+        description: "スキルや経験を伸ばしたい",
+      },
+      {
+        value: "freedom",
+        label: "自由・裁量",
+        description: "時間や場所・進め方の自由",
+      },
+      {
+        value: "relation",
+        label: "人との関わり",
+        description: "同僚・顧客・社会との接点",
+      },
+      {
+        value: "meaning",
+        label: "社会的意義",
+        description: "役に立っている実感",
+      },
+      {
+        value: "reward",
+        label: "報酬",
+        description: "対価としての高い収入",
+      },
     ],
     next: "meaning_priority",
   },
 
   // §3-7. meaning_priority(意義 vs 成功)【MUST・B群・3 択】
+  // v2(2026-06-02): タイトルから「あえて並べるなら、」を削除 + 全角 ? +
+  // balance(両立を狙いたい)を末尾「どちらともいえない/わからない」に集約。value 維持。
   {
     id: "meaning_priority",
     axis: "personality",
     type: "single",
-    title: "あえて並べるなら、仕事に求めるのは「意義」と「成功」どちら?",
+    title: "仕事に求めるのは「意義」と「成功」どちら？",
     description:
       "二者択一を強制するのは「優先順位の傾き」を取りたいため。両立を否定するものではありません。",
     required: true,
     choices: [
       {
         value: "meaning_priority",
-        label: "意義(社会の役に立つ・誰かを助ける実感が大事)",
+        label: "意義",
+        description: "社会の役に立つ・誰かを助ける実感が大事",
       },
-      { value: "balance", label: "両立を狙いたい(どちらも大事)" },
       {
         value: "success_priority",
-        label: "成功(経済的・社会的に評価されることが大事)",
+        label: "成功",
+        description: "経済的・社会的に評価されることが大事",
+      },
+      {
+        value: "balance",
+        label: "どちらともいえない/わからない",
+        description: "両立を狙いたい / 決められない",
       },
     ],
     next: "competition_pref",
   },
 
   // §3-8. competition_pref(競争心)【MUST・B群・3 択 / v2 確定版 neither 追加】
+  // v2(2026-06-02): neither を末尾へ並び替え + 各 Choice.description で補足。
   {
     id: "competition_pref",
     axis: "personality",
     type: "single",
-    title: "他人と比べて評価される環境はどう感じますか?",
+    title: "他人と比べて評価される環境はどう感じますか？",
     description:
       "営業ノルマ・売上ランキング・年次評価ランキング・コンペ・コンテスト等を想定してください。「どちらともいえない」は「環境や評価軸による」「強い傾向はない」を意味します(回答保留ではありません)。",
     required: true,
     choices: [
       {
         value: "compete_motivated",
-        label: "燃える(競争があるほうがやる気が出る)",
-      },
-      {
-        value: "neither",
-        label: "どちらともいえない(環境や評価軸による / 強い傾向はない)",
+        label: "燃える",
+        description: "競争があるほうがやる気が出る",
       },
       {
         value: "compete_drain",
-        label: "疲れる(マイペースのほうが力を発揮できる)",
+        label: "疲れる",
+        description: "マイペースのほうが力を発揮できる",
+      },
+      {
+        value: "neither",
+        label: "どちらともいえない",
+        description: "環境や評価軸による / 強い傾向はない",
       },
     ],
     next: "risk_pref",
   },
 
   // §3-9. risk_pref(リスク選好)【MUST・D群・3 択 / v1 2 択を拡張】
+  // v2(2026-06-02): 「バランス」を「どちらともいえない」に改称 + 末尾へ並び替え。
+  // value(risk_balance)は維持。
   {
     id: "risk_pref",
     axis: "personality",
     type: "single",
-    title: "進路選択で「安定」と「リスクを取る」、どちらに傾きますか?",
+    title: "進路選択で「安定」と「リスクを取る」、どちらに傾きますか？",
     description:
       "例えば「大手で安定 vs スタートアップ・独立」「資格職で安定 vs 自分のビジネス」など。",
     required: true,
     choices: [
-      { value: "safe", label: "安定を重視する(リスクは最小化したい)" },
       {
-        value: "risk_balance",
-        label: "バランス(リスクは限定したいが、伸び代も欲しい)",
+        value: "safe",
+        label: "安定を重視する",
+        description: "リスクは最小化したい",
       },
       {
         value: "risk_take",
-        label: "リスクを取って大きく狙う(上振れを優先)",
+        label: "リスクを取って大きく狙う",
+        description: "上振れを優先",
+      },
+      {
+        value: "risk_balance",
+        label: "どちらともいえない",
+        description: "リスクは限定したいが、伸び代も欲しい",
       },
     ],
     next: "learning_depth",
   },
 
   // §3-10. learning_depth(学習スタイル)【MUST・C群・3 択 / v1 work_style_pref を改名拡張】
+  // v2(2026-06-02): タイトル「傾きますか?」→「近いですか?」+ 全角 ?。
+  // 動詞「学ぶ / 試す」、数え方「1 つ / 広く」で統一(かおる指摘の動詞・単位ばらけ解消)。
+  // mix_learning は「どちらともいえない」に集約 + 末尾へ並び替え(value 維持)。
   {
     id: "learning_depth",
     axis: "personality",
     type: "single",
-    title: "新しいスキルを学ぶ時、どちらに傾きますか?",
+    title: "新しいスキルを学ぶ時、どちらに近いですか？",
     description:
       "スキル習得のスタイルです。今すでに学んでいるかどうかは問いません。",
     required: true,
     choices: [
       {
         value: "deep_focus",
-        label: "1 つをコツコツ深掘りしたい(専門家を目指す方向)",
-      },
-      {
-        value: "mix_learning",
-        label: "1〜2 個を中心に、関連分野も広げたい",
+        label: "1 つを深く学ぶ",
+        description: "専門家を目指す方向",
       },
       {
         value: "wide_explore",
-        label: "興味のあるものを次々試したい(広く触れて選びたい)",
+        label: "広く色々試す",
+        description: "興味のあるものを次々試して選びたい",
+      },
+      {
+        value: "mix_learning",
+        label: "どちらともいえない",
+        description: "中心は決めつつ、関連分野も広げる",
       },
     ],
     next: "failure_recovery",
   },
 
   // §3-11. failure_recovery(失敗からの立ち直り)【MUST・C群・3 択 / v2 確定版 neither 追加】
+  // v2(2026-06-02): neither を末尾へ並び替え + 各 Choice.description で補足。
+  // careful_after は「一度引きずる」→「引きずる」(「一度」削除・かおる指摘)。
   {
     id: "failure_recovery",
     axis: "personality",
     type: "single",
-    title: "仕事で失敗した時、自分はどちらのタイプですか?",
+    title: "仕事で失敗した時、自分はどちらのタイプですか？",
     description:
       "立ち直る速さや学び方の傾向です。「どちらともいえない」は「失敗の種類による」「両方の側面がある」を意味します(回答保留ではありません)。",
     required: true,
     choices: [
       {
         value: "retry_fast",
-        label: "切り替えて次に行ける(失敗は学びと捉えて再挑戦)",
-      },
-      {
-        value: "neither",
-        label: "どちらともいえない(失敗の種類による / 両方の側面がある)",
+        label: "切り替えて次に行ける",
+        description: "失敗は学びと捉えて再挑戦",
       },
       {
         value: "careful_after",
-        label: "一度引きずる(同じ失敗を避けるため慎重になる)",
+        label: "引きずる",
+        description: "同じ失敗を避けるため慎重になる",
+      },
+      {
+        value: "neither",
+        label: "どちらともいえない",
+        description: "失敗の種類による / 両方の側面がある",
       },
     ],
     next: "location_preference",
   },
 
   // §3-12. location_preference(勤務地希望)【MUST・E群・5 択 / GOAL v2.2 §7 申し送り】
+  // v2(2026-06-02): 各選択肢の補足を Choice.description に分離。
   {
     id: "location_preference",
     axis: "personality",
     type: "single",
-    title: "働く場所として希望するのはどこですか?",
+    title: "働く場所として希望するのはどこですか？",
     description:
       "現在の居住地(ORIGIN の現居住エリア)とは別に、これから働きたい・働き続けたい場所の希望を選んでください。",
     required: true,
     choices: [
       {
         value: "keep_current",
-        label: "今住んでいる地域で働きたい(転居はしたくない)",
+        label: "今住んでいる地域で働きたい",
+        description: "転居はしたくない",
       },
       {
         value: "metro_pref",
-        label: "都市部で働きたい(三大都市圏・地方主要都市)",
+        label: "都市部で働きたい",
+        description: "三大都市圏・地方主要都市",
       },
       {
         value: "rural_pref",
-        label: "地方・郊外で働きたい(現在都市部にいる人の地方移住含む)",
+        label: "地方・郊外で働きたい",
+        description: "現在都市部にいる人の地方移住含む",
       },
       { value: "overseas_pref", label: "海外で働きたい" },
       { value: "anywhere", label: "場所はこだわらない" },
@@ -1619,50 +1730,67 @@ export const QUESTIONS: Question[] = [
   },
 
   // §3-13. remote_preference(リモート / 出社の希望)【MUST・E群・5 択 / GOAL v2.2 §7 申し送り】
+  // v2(2026-06-02): ラベル末尾の「希望」「がよい」を統一して外す + 「完全リモート希望」→「フルリモート」+
+  // 各 Choice.description で補足。
   {
     id: "remote_preference",
     axis: "personality",
     type: "single",
-    title: "出社 / リモート の希望はどれですか?",
+    title: "出社 / リモート の希望はどれですか？",
     description: "現職の現状ではなく、これからの希望を選んでください。",
     required: true,
     choices: [
-      { value: "office_pref", label: "出社中心がよい(対面で働きたい)" },
+      {
+        value: "office_pref",
+        label: "出社中心",
+        description: "対面で働きたい",
+      },
       {
         value: "hybrid_office",
-        label: "ハイブリッド・出社多め(週 3 以上出社)",
+        label: "ハイブリッド・出社多め",
+        description: "週 3 以上出社",
       },
       {
         value: "hybrid_remote",
-        label: "ハイブリッド・リモート多め(週 3 以上リモート)",
+        label: "ハイブリッド・リモート多め",
+        description: "週 3 以上リモート",
       },
-      { value: "remote_full", label: "完全リモート希望" },
-      { value: "flexible", label: "こだわらない(業務都合に合わせられる)" },
+      { value: "remote_full", label: "フルリモート" },
+      {
+        value: "flexible",
+        label: "こだわらない",
+        description: "業務都合に合わせられる",
+      },
     ],
     next: "wlb_priority",
   },
 
-  // §3-14. wlb_priority(仕事と私生活のバランス)【MUST・E群・3 択】
+  // §3-14. wlb_priority(仕事とプライベートのバランス)【MUST・E群・3 択】
   // GOAL.goal_avoid 撤去(v2.2)の代替フィルタ。長時間労働回避は wlb_priority=wlb_priority で判定。
+  // v2(2026-06-02): タイトル全面リライト(「私生活」→「プライベート」/「傾けたい」→「重要視」)+
+  // 各選択肢を短い体言止めに統一 + 補足を Choice.description に分離。value は全件維持。
   {
     id: "wlb_priority",
     axis: "personality",
     type: "single",
-    title: "仕事と私生活のバランスは、どちらに傾けたいですか?",
+    title: "仕事とプライベート、どちらを重要視しますか？",
     description: "「バランスを取りたい」を選んでも構いません。",
     required: true,
     choices: [
       {
         value: "wlb_priority",
-        label: "私生活を優先したい(時間の余裕・趣味・家族の時間を確保)",
-      },
-      {
-        value: "wlb_balance",
-        label: "バランスを取りたい(どちらも犠牲にしたくない)",
+        label: "プライベート",
+        description: "時間の余裕・趣味・家族の時間を確保したい",
       },
       {
         value: "work_priority",
-        label: "仕事に没頭したい(プライベートより仕事の時間に投資)",
+        label: "仕事",
+        description: "プライベートより仕事の時間に投資したい",
+      },
+      {
+        value: "wlb_balance",
+        label: "同じくらい",
+        description: "どちらも犠牲にしたくない",
       },
     ],
     next: "mindset_freenote",
