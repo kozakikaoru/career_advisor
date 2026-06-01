@@ -4,9 +4,13 @@ import { getRepository } from "@/lib/db";
 import { getEnv } from "@/env";
 import { ResultView } from "@/components/result/ResultView";
 
-// 共有URLが検索エンジンにインデックスされないように noindex を付ける(data-model.md §4)。
+/**
+ * v2: 結果ページの <head><title> はアプリ名固定(specs §3-8 / §8-5)。
+ * 動的 metadata は使わない。OG タグも固定文言。
+ */
 export const metadata: Metadata = {
-  title: "あなたの進路プラン｜NEXUS.path",
+  title: "NEXUS.path - 進路ロードマップ",
+  description: "あなたの進路ロードマップを 3 本のプランで提示します。",
   robots: { index: false, follow: false },
 };
 
@@ -22,6 +26,8 @@ export default async function ResultPage({
 
   const repo = await getRepository();
   const result = await repo.get(id);
+  // v2: 過去結果(v1 schema)は repo.get() 側で zod 検証に失敗して null になる。
+  // → notFound() で 404 を返す(specs §8-6 / 論点 8)。
   if (!result) notFound();
 
   const base = getEnv().APP_BASE_URL.replace(/\/$/, "");

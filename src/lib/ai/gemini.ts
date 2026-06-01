@@ -6,8 +6,12 @@ import { buildPrompt } from "./prompt";
 import { getEnv } from "@/env";
 
 /**
- * Gemini 実装。構造化JSON出力(responseMimeType + responseSchema)で形を誘導し、
- * 返ってきた JSON を Zod(CareerPlanSchema)で最終検証する。失敗時は1回リトライ(既定)。
+ * Gemini 実装(v2 / specs §8-3)。
+ *
+ * 構造化 JSON 出力(responseMimeType + responseSchema)で形を誘導し、
+ * 返ってきた JSON を Zod(CareerPlanSchema v2)で最終検証する。
+ * 失敗時は 1 回リトライ(既定)。「plans が 3 件でない」等もリトライ対象。
+ *
  * ログには回答本文・結果本文を残さない(プロバイダ名・所要時間・成否のみ)。
  */
 export class GeminiProvider implements AIProvider {
@@ -29,11 +33,10 @@ export class GeminiProvider implements AIProvider {
 
     let lastError = "unknown";
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      // リトライ時は「前回の出力が不正だった」旨を添える
       const prompt =
         attempt === 0
           ? basePrompt
-          : `${basePrompt}\n\n（前回の出力はスキーマ検証に失敗しました。指定スキーマに厳密に従う JSON のみを再出力してください。）`;
+          : `${basePrompt}\n\n（前回の出力はスキーマ検証に失敗しました。指定スキーマに厳密に従う JSON のみを再出力してください。plans は必ず 3 件です。)`;
 
       try {
         const res = await withTimeout(
@@ -52,7 +55,7 @@ export class GeminiProvider implements AIProvider {
         const text = res.text ?? "";
         const parsed = safeJsonParse(text);
         const validated = CareerPlanSchema.safeParse(parsed);
-        if (validated.success) return validated.data; // ★ Zod で最終検証
+        if (validated.success) return validated.data;
         lastError = "schema_validation_failed";
       } catch (e) {
         lastError = e instanceof Error ? e.name : "request_failed";
@@ -75,10 +78,8 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 /** ```json フェンスや前後ノイズを除去してから JSON.parse する防御的パーサ */
 export function safeJsonParse(raw: string): unknown {
   let s = raw.trim();
-  // ```json ... ``` / ``` ... ``` フェンスを除去
   const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) s = fence[1].trim();
-  // 最初の { から最後の } までを抜き出す(前後の説明文対策)
   const first = s.indexOf("{");
   const last = s.lastIndexOf("}");
   if (first !== -1 && last !== -1 && last > first) {
@@ -91,83 +92,148 @@ export function safeJsonParse(raw: string): unknown {
   }
 }
 
-/**
- * Gemini が要求する JSON スキーマ形式(Type enum)。
- * CareerPlanSchema と内容を一致させる(ai-layer.md §3)。
- */
+// ============================================================
+// Gemini 構造化出力用スキーマ(CareerPlanSchema v2 と一致させる・ai-layer.md §3)
+// ============================================================
+
+const ROADMAP_NODE_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    timeLabel: { type: Type.STRING, maxLength: "12" },
+    periodText: { type: Type.STRING, maxLength: "20" },
+    title: { type: Type.STRING, maxLength: "40" },
+    description: { type: Type.STRING, minLength: "40", maxLength: "220" },
+    kind: {
+      type: Type.STRING,
+      format: "enum",
+      enum: ["start", "milestone", "goal"],
+    },
+    nowActions: {
+      type: Type.ARRAY,
+      minItems: "1",
+      maxItems: "3",
+      items: { type: Type.STRING, maxLength: "160" },
+    },
+  },
+  required: ["timeLabel", "periodText", "title", "description", "kind"],
+};
+
+const PLAN_CANDIDATE_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING, maxLength: "40" },
+    shortSummary: { type: Type.STRING, maxLength: "60" },
+    detail: { type: Type.STRING, minLength: "120", maxLength: "220" },
+    matchPercent: { type: Type.INTEGER, minimum: 0, maximum: 100 },
+    feasibility: {
+      type: Type.STRING,
+      format: "enum",
+      enum: ["realistic", "challenging", "very_challenging", "extreme_effort"],
+    },
+    warning: { type: Type.STRING, maxLength: "160" },
+    isTop: { type: Type.BOOLEAN },
+  },
+  required: ["title", "shortSummary", "detail", "matchPercent", "feasibility"],
+};
+
+const PLAN_SKILLS_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    mustLearn: {
+      type: Type.ARRAY,
+      minItems: "0",
+      maxItems: "8",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, maxLength: "40" },
+          description: { type: Type.STRING, maxLength: "120" },
+        },
+        required: ["title", "description"],
+      },
+    },
+    emergingSkills: {
+      type: Type.ARRAY,
+      minItems: "1",
+      maxItems: "4",
+      items: { type: Type.STRING, maxLength: "40" },
+    },
+    recommendedCerts: {
+      type: Type.ARRAY,
+      minItems: "0",
+      maxItems: "3",
+      items: { type: Type.STRING, maxLength: "40" },
+    },
+    strengths: {
+      type: Type.ARRAY,
+      minItems: "2",
+      maxItems: "5",
+      items: { type: Type.STRING, maxLength: "20" },
+    },
+  },
+  required: ["mustLearn", "emergingSkills", "recommendedCerts", "strengths"],
+};
+
+const AD_SLOT_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    kind: {
+      type: Type.STRING,
+      format: "enum",
+      enum: ["ad_recruitment", "affiliate"],
+    },
+    headline: { type: Type.STRING, maxLength: "80" },
+    body: { type: Type.STRING, maxLength: "160" },
+    ctaLabel: { type: Type.STRING, maxLength: "40" },
+    ctaUrl: { type: Type.STRING, maxLength: "300" },
+  },
+  required: ["kind"],
+};
+
+const PLAN_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    planType: {
+      type: Type.STRING,
+      format: "enum",
+      enum: [
+        "specialize",
+        "transition",
+        "hybrid",
+        "advance",
+        "new_entry",
+        "side_job",
+        "employ_then_independent",
+        "independent",
+        "small_start",
+      ],
+    },
+    candidate: PLAN_CANDIDATE_SCHEMA,
+    roadmap: {
+      type: Type.ARRAY,
+      minItems: "3",
+      maxItems: "8",
+      items: ROADMAP_NODE_SCHEMA,
+    },
+    skills: PLAN_SKILLS_SCHEMA,
+    adSlot: AD_SLOT_SCHEMA,
+  },
+  required: ["planType", "candidate", "roadmap", "skills", "adSlot"],
+};
+
 const GEMINI_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
     hero: {
       type: Type.OBJECT,
       properties: {
+        tagline: { type: Type.STRING, minLength: "8", maxLength: "40" },
+        durationText: { type: Type.STRING, maxLength: "20" },
+        summary: { type: Type.STRING, minLength: "80", maxLength: "180" },
         currentLabel: { type: Type.STRING, maxLength: "40" },
         goalLabel: { type: Type.STRING, maxLength: "40" },
-        durationText: { type: Type.STRING, maxLength: "20" },
-        summary: { type: Type.STRING, maxLength: "160" },
       },
-      required: ["currentLabel", "goalLabel", "durationText", "summary"],
-    },
-    roadmap: {
-      type: Type.ARRAY,
-      minItems: "2",
-      maxItems: "8",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          timeLabel: { type: Type.STRING, maxLength: "12" },
-          periodText: { type: Type.STRING, maxLength: "20" },
-          title: { type: Type.STRING, maxLength: "40" },
-          description: { type: Type.STRING, maxLength: "200" },
-          kind: {
-            type: Type.STRING,
-            format: "enum",
-            enum: ["start", "milestone", "goal"],
-          },
-        },
-        required: ["timeLabel", "periodText", "title", "description", "kind"],
-      },
-    },
-    candidates: {
-      type: Type.ARRAY,
-      minItems: "1",
-      maxItems: "5",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING, maxLength: "40" },
-          description: { type: Type.STRING, maxLength: "160" },
-          matchPercent: { type: Type.INTEGER, minimum: 0, maximum: 100 },
-          isTop: { type: Type.BOOLEAN },
-        },
-        required: ["title", "description", "matchPercent"],
-      },
-    },
-    skills: {
-      type: Type.OBJECT,
-      properties: {
-        learning: {
-          type: Type.ARRAY,
-          minItems: "1",
-          maxItems: "8",
-          items: { type: Type.STRING, maxLength: "40" },
-        },
-        strengths: {
-          type: Type.ARRAY,
-          minItems: "1",
-          maxItems: "8",
-          items: { type: Type.STRING, maxLength: "20" },
-        },
-      },
-      required: ["learning", "strengths"],
-    },
-    nextAction: {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING, maxLength: "120" },
-        detail: { type: Type.STRING, maxLength: "160" },
-      },
-      required: ["title", "detail"],
+      required: ["tagline", "durationText", "summary"],
     },
     personality: {
       type: Type.OBJECT,
@@ -192,13 +258,14 @@ const GEMINI_RESPONSE_SCHEMA: Schema = {
       },
       required: ["typeName", "emoji", "summary", "traits"],
     },
+    plans: {
+      // tuple([Plan, Plan, Plan]) は Gemini Schema に直接対応がないため、
+      // minItems / maxItems = 3 で固定長を表現する。zod 側で最終検証(length===3)を担保。
+      type: Type.ARRAY,
+      minItems: "3",
+      maxItems: "3",
+      items: PLAN_SCHEMA,
+    },
   },
-  required: [
-    "hero",
-    "roadmap",
-    "candidates",
-    "skills",
-    "nextAction",
-    "personality",
-  ],
+  required: ["hero", "personality", "plans"],
 };

@@ -1,10 +1,13 @@
-import type { CareerPlan } from "@/lib/schema/result";
+import type { Plan } from "@/lib/schema/result";
 import { RoadmapNode } from "./RoadmapNode";
 
-/** A. 段階的ロードマップ(メイン)。ノード配列を可変描画する。 */
-export function Roadmap({ roadmap }: { roadmap: CareerPlan["roadmap"] }) {
+/**
+ * A. 段階的ロードマップ(各案ごと)。ノード配列を可変描画する(3〜8 段)。
+ * specs §3-3 / §5
+ */
+export function Roadmap({ roadmap }: { roadmap: Plan["roadmap"] }) {
   return (
-    <section className="mb-14">
+    <section className="mb-10">
       <div className="glow-card rounded-3xl p-6 sm:p-9">
         <div className="flex items-center gap-3 mb-9">
           <span className="text-xl">🛰️</span>

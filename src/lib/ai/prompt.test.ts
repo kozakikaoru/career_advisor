@@ -246,22 +246,91 @@ describe("buildPrompt — GOAL v2.1 学生フロー整形ガイド", () => {
 });
 
 // ============================================================
-// v2.1: ロードマップ3本提示は本フェーズではスコープ外(TODO コメントの存在確認)
+// 結果 v2: 3 案出力プロンプトガイド(specs/result-v2.md §4)
 // ============================================================
-describe("buildPrompt — v2.1 スコープ外: ロードマップ3本提示の AI 指示は出さない", () => {
-  it("AI への指示文に「3本提示」「classifyLayer」が含まれない(本フェーズではスコープ外)", () => {
-    const a: AnswerMap = { age: 28, stage: "employed" };
-    const p = buildPrompt(a);
-    // §8-5-3 のロードマップ 3 本提示は CareerPlanSchema 拡張を伴う別フェーズ。
-    // 現スキーマは単一 roadmap のため、AI に「3 本出して」と書かないことを担保。
-    // 注: MINDSET v2 で「保守案/チャレンジ案」は解釈ガイドの表現として登場するため、
-    //     「3 本」「3本」「classifyLayer」「3 本提示」のような「AI に 3 本出力させる」表現が
-    //     含まれないことだけを担保する。
-    expect(p).not.toContain("3 本提示");
-    expect(p).not.toContain("3本提示");
-    expect(p).not.toContain("classifyLayer");
-    expect(p).not.toContain("以下の 3 本のロードマップを出力");
-    expect(p).not.toContain("以下の3本のロードマップを出力");
+describe("buildPrompt — 結果 v2 / 3 案出力ガイド(specs/result-v2.md §4)", () => {
+  it("§4-1 業界事情を踏まえた具体提示の指示が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("業界事情を踏まえた具体提示");
+    expect(p).toContain("具体的な数値・期限・手段");
+    expect(p).toContain("採用ルート");
+    expect(p).toContain("職種の細分");
+    expect(p).toContain("雇用形態");
+    expect(p).toContain("学習ルート");
+  });
+
+  it("§4-2 mustLearn の進路依存(0〜8 件可変)の指示が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("mustLearn");
+    expect(p).toContain("0〜8 件");
+    expect(p).toContain("現場で学ぶ");
+    expect(p).toContain("emergingSkills");
+    expect(p).toContain("recommendedCerts");
+  });
+
+  it("§4-3 ロードマップ時間粒度(基本 8 段固定 + 短縮可)の指示が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("基本は **8 段固定**");
+    expect(p).toContain("NOW / 3M / 6M / 1Y / 2Y / 3Y / 5Y / GOAL");
+    expect(p).toContain("nowActions");
+  });
+
+  it("§4-4 feasibility 4 段階 + warning トーン規範(超努力が必要)の指示が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("feasibility");
+    expect(p).toContain("extreme_effort");
+    expect(p).toContain("超努力が必要");
+    expect(p).toContain("warning");
+    // NG 表現と OK 表現の両方が含まれる
+    expect(p).toContain("諦めなさい");
+    expect(p).toContain("覚悟が必要");
+  });
+
+  it("§4-5 plans を 3 本提示する原則(固定長 3 / 3 パターン)の指示が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("plans は固定長 3");
+    expect(p).toContain("specialize");
+    expect(p).toContain("transition");
+    expect(p).toContain("hybrid");
+    expect(p).toContain("advance");
+    expect(p).toContain("new_entry");
+    expect(p).toContain("side_job");
+    expect(p).toContain("employ_then_independent");
+    expect(p).toContain("independent");
+    expect(p).toContain("small_start");
+  });
+
+  it("§4-6 楽観バイアス排除 + hero.tagline 規範が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("楽観バイアス");
+    expect(p).toContain("未確定情報を理由に逃げない");
+    expect(p).toContain("hero.tagline");
+    expect(p).toContain("○○から××へ");
+  });
+
+  it("§4-7 Few-shot 例(roadmap description / mustLearn / tagline)が含まれる", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    // roadmap description の Good 例 10 件のうち主要なものが明文
+    expect(p).toContain("開業資金 50 万円を貯める");
+    expect(p).toContain("ポートフォリオを 5 件作る");
+    expect(p).toContain("TOEIC 700 点取得");
+    expect(p).toContain("簿記 2 級");
+    // NG 例
+    expect(p).toContain("スキルを磨く");
+    expect(p).toContain("努力する");
+    // mustLearn 進路依存
+    expect(p).toContain("接客業");
+    expect(p).toContain("エンジニア・士業・起業");
+    // tagline Good 例
+    expect(p).toContain("3 つの道、どれを選ぶ?");
+    expect(p).toContain("未来は、ここから 3 つに広がる");
+  });
+
+  it("出力制約: plans は 3 件固定 / hero.tagline が必須 / adSlot kind=ad_recruitment を許容", () => {
+    const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).toContain("ちょうど 3 件");
+    expect(p).toContain("hero.tagline");
+    expect(p).toContain("ad_recruitment");
   });
 });
 
