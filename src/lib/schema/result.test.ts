@@ -177,14 +177,14 @@ describe("CareerPlanSchema v2 — トップレベル", () => {
 });
 
 describe("HeroSchema v2", () => {
-  it("tagline は 8 字以上 40 字以下", () => {
+  it("tagline は 8 字以上 80 字以下(2026-06-02 緩和)", () => {
     expect(HeroSchema.safeParse({ ...validHero, tagline: "短い" }).success).toBe(
       false,
     );
     expect(
       HeroSchema.safeParse({
         ...validHero,
-        tagline: "あ".repeat(41),
+        tagline: "あ".repeat(81),
       }).success,
     ).toBe(false);
     expect(
@@ -204,7 +204,7 @@ describe("HeroSchema v2", () => {
 });
 
 describe("PlanCandidateSchema v2", () => {
-  it("detail は 120 字以上 220 字以下", () => {
+  it("detail は 80 字以上 500 字以下(2026-06-02 緩和)", () => {
     expect(
       PlanCandidateSchema.safeParse({
         ...validCandidate,
@@ -214,7 +214,7 @@ describe("PlanCandidateSchema v2", () => {
     expect(
       PlanCandidateSchema.safeParse({
         ...validCandidate,
-        detail: "あ".repeat(230),
+        detail: "あ".repeat(501),
       }).success,
     ).toBe(false);
   });
@@ -248,7 +248,7 @@ describe("PlanCandidateSchema v2", () => {
 });
 
 describe("RoadmapNodeSchema v2", () => {
-  it("description は 40 字以上 220 字以下", () => {
+  it("description は 40 字以上 500 字以下(2026-06-02 緩和)", () => {
     expect(
       RoadmapNodeSchema.safeParse({
         ...validMidNode,
@@ -258,7 +258,7 @@ describe("RoadmapNodeSchema v2", () => {
     expect(
       RoadmapNodeSchema.safeParse({
         ...validMidNode,
-        description: "あ".repeat(230),
+        description: "あ".repeat(501),
       }).success,
     ).toBe(false);
   });
