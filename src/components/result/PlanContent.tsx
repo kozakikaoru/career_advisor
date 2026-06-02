@@ -44,20 +44,20 @@ export function PlanContent({
           type="button"
           onClick={onNavigateNext}
           className={[
-            "group inline-flex items-center gap-2 rounded-full px-5 py-2.5",
-            "text-sm font-display tracking-wide font-medium",
+            "group inline-flex items-center gap-3 rounded-full px-8 sm:px-10 py-4 sm:py-5",
+            "text-base sm:text-lg font-display tracking-wide font-semibold",
             "bg-gradient-to-r from-cyan/10 via-violet/15 to-pink/10",
             "border border-violet/40 text-ice/95",
-            "hover:border-cyan/70 hover:text-cyan",
-            "shadow-[0_0_18px_rgba(168,85,247,0.18)]",
+            "hover:border-cyan/70 hover:text-cyan hover:scale-[1.02]",
+            "shadow-[0_0_28px_rgba(168,85,247,0.22)]",
             "transition",
           ].join(" ")}
-          aria-label={`次の航路(Plan ${nextIndex + 1})を読む`}
+          aria-label={`次のプラン(Plan ${nextIndex + 1})を見る`}
         >
-          <span aria-hidden className="text-cyan/90">✦</span>
+          <span aria-hidden className="text-cyan/90 text-xl">✦</span>
           <span>
-            次の航路を読む
-            <span className="text-mute/80 ml-1.5 text-xs">
+            次のプランを見る
+            <span className="text-mute/80 ml-2 text-sm">
               (Plan {nextIndex + 1})
             </span>
           </span>

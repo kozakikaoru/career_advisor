@@ -31,9 +31,8 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${spaceGrotesk.variable} ${notoSansJp.variable}`}>
       <body className="font-sans text-ice bg-bg min-h-screen overflow-x-hidden">
-        {/* サイト全体の固定星空レイヤー(z-0 / pointer-events:none)。
-            個別ページのコンテンツは z-10 以上で重ねる(既存どおり)。 */}
-        <StarField variant="ambient" density="normal" />
+        {/* 2026-06-03 かおる方針: 後ろのアニメ一旦廃止(StarField/Sparkles 含む全部) */}
+        {/* <StarField variant="ambient" density="normal" /> */}
         {children}
       </body>
     </html>
