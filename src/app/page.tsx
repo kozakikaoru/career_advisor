@@ -35,8 +35,8 @@ export default function Home() {
           </h1>
 
           <p className="text-mute mt-7 text-base sm:text-lg leading-relaxed max-w-xl">
-            いくつかの質問に答えるだけ。AI があなたの現在地・目標・価値観を読み解き、
-            目標達成までの段階的なロードマップを描きます。登録不要・匿名。
+            約 35 問に答えるだけ。AI があなたの現在地・目標・価値観を読み解き、
+            業界事情を踏まえた 3 本の進路ロードマップを提示します。登録不要・匿名。
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -59,7 +59,7 @@ export default function Home() {
                 <polyline points="12 5 19 12 12 19" />
               </svg>
             </Link>
-            <span className="text-xs text-mute">所要 2〜4 分 / 約 12 問</span>
+            <span className="text-xs text-mute">所要 約 10 分 / 約 35 問</span>
           </div>
         </section>
 
@@ -67,19 +67,19 @@ export default function Home() {
         <section className="pb-16">
           <div className="grid sm:grid-cols-3 gap-4 mb-5">
             <Feature
-              emoji="🧭"
-              title="3 つの軸で聞く"
-              text="現在の状況・目標・性格や価値観。回答に応じて質問が分岐します。"
+              emoji="🗺️"
+              title="3 本のロードマップ"
+              text="ひとつの正解に絞らず、複数の進路を並列で提示。タブで切り替えて比較できます。"
             />
             <Feature
-              emoji="🛰️"
-              title="可変ロードマップ"
-              text="あなた専用の段数・期間で、現在地から目標までの道のりを可視化。"
+              emoji="👥"
+              title="10 立場に対応"
+              text="学生・社会人・主婦・退職者など、立場に応じて質問が分岐。誰でも答えられます。"
             />
             <Feature
               emoji="🔗"
-              title="URLで後から再表示"
-              text="結果は匿名で保存。発行されたURLを控えれば別の端末でも開けます。"
+              title="完全匿名 + URL 保存"
+              text="登録・個人情報不要。発行された URL を控えれば別の端末でも再表示できます。"
             />
           </div>
           <p className="text-xs text-mute/70 leading-relaxed max-w-2xl">
