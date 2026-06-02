@@ -30,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" className={`${spaceGrotesk.variable} ${notoSansJp.variable}`}>
-      <body className="font-sans text-ice bg-bg grid-bg min-h-screen overflow-x-hidden">
+      <body className="font-sans text-ice bg-bg min-h-screen overflow-x-hidden">
         {/* サイト全体の固定星空レイヤー(z-0 / pointer-events:none)。
             個別ページのコンテンツは z-10 以上で重ねる(既存どおり)。 */}
         <StarField variant="ambient" density="normal" />

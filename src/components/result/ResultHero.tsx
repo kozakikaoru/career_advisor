@@ -1,18 +1,19 @@
 import type { Hero } from "@/lib/schema/result";
-import { StarField } from "@/components/ui/StarField";
+import { WarpField } from "@/components/ui/WarpField";
 
 /**
  * ヒーロー(全案共通)。
  * v2: tagline(AI 生成キャッチコピー)を大見出しで表示し、
  *     「○○から××へ」の動的表示は廃止(specs §3-1 / §6-3)。
- * v2.1: 「星々が占う」テーマの hero StarField を背景に敷き、tagline 周辺に星屑を散らす。
+ * v2.2: 結果画面は「奥→手前に流れる」遠近表現の WarpField を背景に敷く。
+ *       「ロードマップを描いた=前に進んでいる」気持ちを演出。
  */
 export function ResultHero({ hero }: { hero: Hero }) {
   return (
     <section className="relative pt-14 pb-14 rise overflow-hidden">
-      {/* 結果ヒーロー専用の星空(layout の ambient より少し主張) */}
+      {/* 結果ヒーロー専用の WarpField(奥から手前に流れる遠近表現) */}
       <div className="absolute inset-0 -z-0 pointer-events-none">
-        <StarField variant="hero" density="normal" />
+        <WarpField />
       </div>
 
       <div className="relative">

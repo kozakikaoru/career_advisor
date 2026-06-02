@@ -53,51 +53,107 @@ body {
     0 0 30px -6px rgba(34, 211, 238, 0.5);
 }
 
-/* roadmap connector */
+/* =========================================================================
+   Roadmap — 星座を結ぶような道筋(線)+ 星型のノード
+   - 旧 .road-line(紫グラデの実線)を「光るドットの連なり」風に置換
+   - .node-star でノードを星型 SVG にしている(RoadmapNode 側)
+   ========================================================================= */
 .road-line::before {
   content: "";
   position: absolute;
   left: 23px;
-  top: 48px;
-  bottom: -26px;
+  top: 56px;
+  bottom: -18px;
   width: 2px;
   border-radius: 99px;
-  background: linear-gradient(to bottom, rgba(168, 85, 247, 0.7), rgba(34, 211, 238, 0.15));
+  /* 星座を結ぶ細い線 — 細かいドットを並べた点線で「星と星をつなぐライン」感を出す */
+  background-image: radial-gradient(
+    circle,
+    rgba(168, 85, 247, 0.55) 0,
+    rgba(168, 85, 247, 0.55) 1.2px,
+    transparent 1.6px
+  );
+  background-size: 2px 8px;
+  background-repeat: repeat-y;
+  background-position: center;
+  /* 全体に薄く脈動させて「占いの星座が呼吸している」感じ */
+  animation: road-line-twinkle 3.8s ease-in-out infinite;
 }
 .road-item:last-child .road-line::before {
   display: none;
 }
+@keyframes road-line-twinkle {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
 .node-glow {
   box-shadow: 0 0 22px -4px var(--g, rgba(34, 211, 238, 0.7));
 }
 
-/* node-star: 結果ロードマップのノードを「星」っぽく見せるためのハロー。
-   ::before で大きめの放射ハローを置き、ふんわり脈動させる。 */
+/* node-star: ロードマップのノードを「星」として見せるためのハロー(放射光)。
+   ::before で大きめのソフトハロー、::after で4本の十字光条(レンズフレア風)。 */
 .node-star {
   position: absolute;
 }
 .node-star::before {
   content: "";
   position: absolute;
-  inset: -10px;
+  inset: -14px;
   border-radius: 50%;
   background: radial-gradient(closest-side, var(--g, rgba(34, 211, 238, 0.5)), transparent 70%);
-  filter: blur(6px);
-  opacity: 0.65;
+  filter: blur(8px);
+  opacity: 0.7;
   z-index: -1;
   animation: node-star-pulse 4.2s ease-in-out infinite;
   pointer-events: none;
 }
+/* 十字光条(星の輝き感を強める) */
+.node-star::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    /* 縦の光条 */ linear-gradient(
+      0deg,
+      transparent 30%,
+      var(--g, rgba(34, 211, 238, 0.7)) 50%,
+      transparent 70%
+    ),
+    /* 横の光条 */
+      linear-gradient(
+        90deg,
+        transparent 30%,
+        var(--g, rgba(34, 211, 238, 0.7)) 50%,
+        transparent 70%
+      );
+  filter: blur(2px);
+  opacity: 0.5;
+  z-index: -1;
+  animation: node-star-twinkle 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
 .node-star--goal::before {
-  inset: -14px;
-  animation-duration: 3.6s;
+  inset: -20px;
+  animation-duration: 3.4s;
+  opacity: 0.85;
+}
+.node-star--goal::after {
+  animation-duration: 2.8s;
+  opacity: 0.7;
 }
 @keyframes node-star-pulse {
-  0%, 100% { opacity: 0.55; transform: scale(0.9); }
-  50%      { opacity: 0.95; transform: scale(1.1); }
+  0%, 100% { opacity: 0.5;  transform: scale(0.9); }
+  50%      { opacity: 0.95; transform: scale(1.12); }
+}
+@keyframes node-star-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.85) rotate(0deg); }
+  50%      { opacity: 0.75; transform: scale(1.1) rotate(45deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .node-star::before { animation: none !important; }
+  .node-star::before,
+  .node-star::after,
+  .road-line::before { animation: none !important; }
 }
 
 .rise {
@@ -114,14 +170,8 @@ body {
   }
 }
 
-.grid-bg {
-  background-image:
-    radial-gradient(60% 50% at 50% 0%, rgba(168, 85, 247, 0.18), transparent 70%),
-    radial-gradient(40% 40% at 85% 20%, rgba(34, 211, 238, 0.14), transparent 70%),
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: auto, auto, 44px 44px, 44px 44px;
-}
+/* かつての .grid-bg(中央放射グラデ + 縦横グリッド)は幻想テーマと不整合のため撤去。
+   背景は StarField(光点 + ネビュラ) + 各ページの PlanetField / WarpField に一任。 */
 
 /* =========================================================================
    星々が占う・幻想テーマ
@@ -232,6 +282,237 @@ body {
   100% {
     opacity: 0;
     transform: translate(220px, 80px) rotate(20deg);
+  }
+}
+
+/* =========================================================================
+   PlanetField — トップヒーロー右下の「画面外にはみ出した大惑星 + 公転する星々」
+   - 親要素 .planet-field を hero 内の絶対配置レイヤに置く想定
+   - 惑星のサイズ・位置は CSS のみで完結(スマホでも崩れない)
+   - prefers-reduced-motion 時は軌道の公転を停止(惑星のリング呼吸は残す)
+   ========================================================================= */
+.planet-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 惑星 + 軌道リング + 公転星の「中心」コンテナ
+   - 親 (.planet-field) に対して右下に配置し、半分くらい外にはみ出させる
+   - 直径は min(viewport幅 * 0.95, 640px) を上限にして大きすぎないように制御 */
+.planet-field__core {
+  position: absolute;
+  width: clamp(360px, 95vw, 640px);
+  height: clamp(360px, 95vw, 640px);
+  /* 中心を画面右下からオフセット。translate で半分外に出す。 */
+  right: 0;
+  bottom: 0;
+  transform: translate(40%, 38%);
+}
+
+/* スマホ縦長(モバイル)では惑星をさらに少しコンパクトに、見切れも控えめに */
+@media (max-width: 640px) {
+  .planet-field__core {
+    width: clamp(280px, 90vw, 460px);
+    height: clamp(280px, 90vw, 460px);
+    transform: translate(32%, 32%);
+  }
+}
+
+/* 惑星本体 — radial-gradient + 多段 box-shadow で発光リングを作る */
+.planet-field__planet {
+  position: absolute;
+  inset: 25%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      rgba(244, 114, 182, 0.55) 0%,
+      rgba(168, 85, 247, 0.6) 32%,
+      rgba(58, 36, 120, 0.85) 62%,
+      rgba(7, 9, 18, 1) 92%
+    );
+  box-shadow:
+    /* 外側ハロー(紫) */ 0 0 80px 8px rgba(168, 85, 247, 0.28),
+    /* 外側ハロー(ピンク) */ 0 0 160px 20px rgba(244, 114, 182, 0.18),
+    /* 外側ハロー(シアン弱) */ 0 0 240px 40px rgba(34, 211, 238, 0.08),
+    /* インナー縁取り */ inset 0 0 60px 8px rgba(34, 211, 238, 0.18),
+    inset 0 0 120px 12px rgba(168, 85, 247, 0.16);
+  animation: planet-breathe 9s ease-in-out infinite;
+  will-change: transform, box-shadow;
+}
+
+/* 惑星のリング(SF の土星リング感を薄く出す) */
+.planet-field__planet::before {
+  content: "";
+  position: absolute;
+  left: -22%;
+  right: -22%;
+  top: 44%;
+  height: 12%;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    rgba(34, 211, 238, 0) 0%,
+    rgba(34, 211, 238, 0.35) 30%,
+    rgba(244, 114, 182, 0.4) 55%,
+    rgba(168, 85, 247, 0.3) 75%,
+    rgba(168, 85, 247, 0) 100%
+  );
+  filter: blur(2px);
+  transform: rotate(-18deg);
+  opacity: 0.7;
+}
+
+@keyframes planet-breathe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 80px 8px rgba(168, 85, 247, 0.28),
+      0 0 160px 20px rgba(244, 114, 182, 0.18),
+      0 0 240px 40px rgba(34, 211, 238, 0.08),
+      inset 0 0 60px 8px rgba(34, 211, 238, 0.18),
+      inset 0 0 120px 12px rgba(168, 85, 247, 0.16);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow:
+      0 0 100px 12px rgba(168, 85, 247, 0.36),
+      0 0 200px 26px rgba(244, 114, 182, 0.22),
+      0 0 300px 50px rgba(34, 211, 238, 0.12),
+      inset 0 0 70px 10px rgba(34, 211, 238, 0.22),
+      inset 0 0 140px 16px rgba(168, 85, 247, 0.2);
+  }
+}
+
+/* 軌道リング — 公転軌道を薄い円で示す。少し楕円に潰して立体感を出す。 */
+.planet-field__orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotateX(58deg);
+  border-radius: 50%;
+  border: 1px solid rgba(168, 85, 247, 0.1);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.05) inset;
+  pointer-events: none;
+}
+
+/* 公転星のラッパー — このラッパー自身が惑星中心を回転する。
+   ラッパーは軌道直径と同じサイズの正方形で、中心を origin にして transform: rotate() */
+.planet-field__satellite-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotateX(58deg);
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* 公転星本体 — ラッパー回転に対して逆回転は不要(rotate のみで軌道に乗る) */
+.planet-field__satellite {
+  position: absolute;
+  /* ラッパーは正方形なので、top 0 / left 50% に置くと「軌道の真上」になる */
+  left: 50%;
+  top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes planet-orbit {
+  from {
+    transform: translate(-50%, -50%) rotateX(58deg) rotateZ(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotateX(58deg) rotateZ(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planet-field__satellite-wrap,
+  .planet-field__planet {
+    animation: none !important;
+  }
+}
+
+/* =========================================================================
+   WarpField — 結果ヒーロー用「奥→手前」遠近の流れ星空(ハイパースペース風)
+   ========================================================================= */
+.warp-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* 立体パースで奥行きをほんの少し補強(変化は控えめ) */
+  perspective: 800px;
+}
+
+/* 中央の消失点ヒント — うっすら光る点(必要以上に主張しない) */
+.warp-field__core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(231, 236, 255, 0.85);
+  box-shadow:
+    0 0 12px rgba(231, 236, 255, 0.5),
+    0 0 40px rgba(168, 85, 247, 0.35),
+    0 0 100px rgba(34, 211, 238, 0.2);
+  transform: translate(-50%, -50%);
+  opacity: 0.55;
+  animation: warp-core-pulse 3.8s ease-in-out infinite;
+}
+@keyframes warp-core-pulse {
+  0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.9); }
+  50%      { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* 各星本体 — 中央(消失点)に絶対配置し、keyframes で外側に向かって流れる */
+.warp-field__streak {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 99px;
+  /* keyframes 内で参照する CSS 変数のデフォルト値 */
+  --tx: 0vmax;
+  --ty: 0vmax;
+  --end-scale: 2;
+  /* 初期状態(opacity 0)— keyframes でフェードイン → アウト */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+@keyframes warp-flow {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    /* ふっと光って出てくる(中央→少し外側) */
+    opacity: 0.95;
+  }
+  80% {
+    /* ほぼ画面端まで来た時点でまだ光ってる */
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--tx), var(--ty))
+      scale(var(--end-scale));
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .warp-field__streak,
+  .warp-field__core {
+    animation: none !important;
+  }
+  .warp-field__streak {
+    opacity: 0.4;
   }
 }
 
