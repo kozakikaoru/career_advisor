@@ -47,7 +47,7 @@ function NodeIcon({ node }: { node: RoadmapNodeType }) {
   if (node.kind === "start") {
     return (
       <div
-        className="node-glow absolute left-0 top-0 w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan to-violet flex items-center justify-center"
+        className="node-glow node-star absolute left-0 top-0 w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan to-violet flex items-center justify-center"
         style={{ ["--g" as string]: "rgba(34,211,238,0.7)" }}
       >
         <span className="text-bg text-lg">📍</span>
@@ -57,7 +57,7 @@ function NodeIcon({ node }: { node: RoadmapNodeType }) {
   if (node.kind === "goal") {
     return (
       <div
-        className="node-glow absolute left-0 top-0 w-12 h-12 rounded-2xl bg-gradient-to-br from-violet to-pink flex items-center justify-center"
+        className="node-glow node-star node-star--goal absolute left-0 top-0 w-12 h-12 rounded-2xl bg-gradient-to-br from-violet to-pink flex items-center justify-center"
         style={{ ["--g" as string]: "rgba(244,114,182,0.8)" }}
       >
         <span className="text-lg">🏆</span>
@@ -67,7 +67,7 @@ function NodeIcon({ node }: { node: RoadmapNodeType }) {
   // milestone — 短いラベルでも崩れないよう min-width 固定(specs §5-4)
   return (
     <div
-      className="node-glow absolute left-0 top-0 w-12 h-12 rounded-2xl bg-panel2 border border-line flex items-center justify-center px-1"
+      className="node-glow node-star absolute left-0 top-0 w-12 h-12 rounded-2xl bg-panel2 border border-line flex items-center justify-center px-1"
       style={{ ["--g" as string]: "rgba(168,85,247,0.4)" }}
     >
       <span className="font-display text-sm font-bold text-violet text-center leading-none">

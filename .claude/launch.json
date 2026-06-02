@@ -46,7 +46,8 @@
       "port": 3500,
       "env": {
         "AI_PROVIDER": "mock",
-        "SQLITE_PATH": "./data/rl-dev-preview.sqlite"
+        "SQLITE_PATH": "./data/rl-dev-preview.sqlite",
+        "PATH": "/usr/local/opt/node/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       }
     },
     {
