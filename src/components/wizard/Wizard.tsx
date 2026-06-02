@@ -15,10 +15,30 @@ import { QuestionStep } from "./QuestionStep";
 import { ProgressBar } from "./ProgressBar";
 import { Logo } from "@/components/ui/Logo";
 import { Loading } from "@/components/Loading";
+import { MonthlyLimitView } from "@/components/RateLimit/MonthlyLimitView";
+import { RateLimitView } from "@/components/RateLimit/RateLimitView";
 
 const set = QUESTION_SET;
 
-type Phase = "consent" | "asking" | "generating" | "error";
+type Phase =
+  | "consent"
+  | "asking"
+  | "generating"
+  | "error"
+  | "monthly_limit"
+  | "rate_limit";
+
+/**
+ * /api/generate がレート制限関連エラーで返してきた JSON 形(API 側と一致させる)。
+ * 該当しないキーが欠けることもあるので optional。
+ */
+type RateLimitResponse = {
+  error?: string;
+  limit?: number;
+  count?: number;
+  resetAt?: string;
+  retryAfterSec?: number;
+};
 
 // TODO(temp): MINDSET 確認完了後に削除予定
 // (specs/mindset-questions-v2.md §8-9 / 一時機能・URL を知っている人だけが使う開発用)
@@ -58,8 +78,15 @@ export function Wizard() {
   const searchParams = useSearchParams();
   const devMode = searchParams?.get("dev");
   const isDevMindset = devMode === "mindset";
+  // レート制限の 503 / 429 画面を単独確認するための dev フラグ。
+  // `?dev=ratelimit_monthly` → 月次上限画面 / `?dev=ratelimit_429` → 短期窓レート画面
+  // (本番にバレてもダミーデータが表示されるだけで悪用余地なし)
+  const isDevMonthly = devMode === "ratelimit_monthly";
+  const isDevRate = devMode === "ratelimit_429";
 
-  const [phase, setPhase] = useState<Phase>("consent");
+  const [phase, setPhase] = useState<Phase>(
+    isDevMonthly ? "monthly_limit" : isDevRate ? "rate_limit" : "consent",
+  );
   const [consent, setConsent] = useState(false);
   // TODO(temp): MINDSET 確認完了後に削除予定 — dev=mindset 時は ORIGIN/GOAL のダミー値を投入
   const [answers, setAnswers] = useState<AnswerMap>(() =>
@@ -70,6 +97,27 @@ export function Wizard() {
     isDevMindset ? DEV_MINDSET_START_ID : set.firstId,
   );
   const [history, setHistory] = useState<string[]>([]);
+  // レート制限関連の表示用 state(API から返ってきたデータを保持)
+  // dev フラグ時はダミー値を初期投入してその場で 503 / 429 画面を表示する。
+  const [monthlyInfo, setMonthlyInfo] = useState<{
+    limit: number;
+    count: number;
+    resetAt: string | null;
+  } | null>(
+    isDevMonthly
+      ? {
+          limit: 2000,
+          count: 2000,
+          resetAt: new Date(
+            // JST 翌月 1 日 00:00 を雑にローカル時刻 +35 日で代用(表示確認用)
+            Date.now() + 35 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        }
+      : null,
+  );
+  const [rateInfo, setRateInfo] = useState<{ retryAfterSec: number } | null>(
+    isDevRate ? { retryAfterSec: 600 } : null,
+  );
 
   // 質問遷移・フェーズ遷移のたびにページトップへスクロール
   // (前の質問のスクロール位置が引き継がれて気持ち悪いのを防ぐ)
@@ -197,7 +245,39 @@ export function Wizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: cleanAnswers, consent: true }),
+        // セッション cookie が初回付与されるよう credentials:'same-origin'(既定だが明示)
+        credentials: "same-origin",
       });
+
+      // レート制限関連(503 / 429)を専用画面に振り分ける。
+      // 通常エラー(500/502 等)は従来通り error フェーズへ。
+      if (res.status === 503 || res.status === 429) {
+        let body: RateLimitResponse = {};
+        try {
+          body = (await res.json()) as RateLimitResponse;
+        } catch {
+          /* JSON 取れなくてもフォールバックで表示 */
+        }
+        if (res.status === 503) {
+          setMonthlyInfo({
+            limit: body.limit ?? 0,
+            count: body.count ?? 0,
+            resetAt: body.resetAt ?? null,
+          });
+          setPhase("monthly_limit");
+          return;
+        }
+        // 429: Retry-After ヘッダを優先、フォールバックで body.retryAfterSec
+        const headerSec = Number(res.headers.get("Retry-After") ?? "");
+        const sec =
+          Number.isFinite(headerSec) && headerSec > 0
+            ? Math.ceil(headerSec)
+            : (body.retryAfterSec ?? 60);
+        setRateInfo({ retryAfterSec: sec });
+        setPhase("rate_limit");
+        return;
+      }
+
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as { id?: string };
       if (!data.id) throw new Error("no id");
@@ -311,6 +391,29 @@ export function Wizard() {
         )}
 
         {phase === "generating" && <Loading />}
+
+        {phase === "monthly_limit" && monthlyInfo && (
+          <MonthlyLimitView
+            limit={monthlyInfo.limit}
+            count={monthlyInfo.count}
+            resetAt={monthlyInfo.resetAt}
+          />
+        )}
+
+        {phase === "rate_limit" && rateInfo && (
+          <RateLimitView
+            // retryAfterSec が変わった場合に内部 state(remaining)を再初期化するため
+            // key で強制再マウントする。
+            key={rateInfo.retryAfterSec}
+            retryAfterSec={rateInfo.retryAfterSec}
+            onRetry={() => {
+              // 残時間 0 で再試行ボタンを押されたら、再度送信を試みる。
+              // セッションは維持されるが、IP/session 短期窓は時間が経っていればリセット済み。
+              setRateInfo(null);
+              void submit();
+            }}
+          />
+        )}
 
         {phase === "error" && (
           <div className="glow-card rounded-3xl p-7 sm:p-10 text-center rise">
