@@ -13,8 +13,10 @@ import {
 } from "@/lib/rate-limit";
 import { buildSessionSetCookie } from "@/lib/rate-limit/session";
 
-// AI 生成は数十秒かかりうる。Vercel の実行時間上限内で最大化する。
-export const maxDuration = 60;
+// AI 生成は数十秒〜数分かかりうる(Pro + thinking + Tier 1 で 503 リトライ込みで延長)。
+// 仮設定: 10 分(かおる方針 2026-06-02・Tier 1 の 503 で粘るため)。
+// 注: Vercel Hobby は 60s 上限・Pro は 300s・Enterprise なら 900s。本番デプロイ前に再調整。
+export const maxDuration = 600;
 export const runtime = "nodejs";
 
 /**
@@ -121,7 +123,7 @@ export async function POST(req: Request) {
     // --- 4. AI 生成(内部で Zod 検証 + リトライ) ---
     const provider = await getAIProvider();
     const plan = await provider.generateCareerPlan(answers, {
-      timeoutMs: 45_000,
+      timeoutMs: 540_000,
       maxRetries: 1,
     });
 

@@ -48,51 +48,48 @@ export const FeasibilitySchema = z.enum([
 /** ロードマップの 1 ノード(段数可変 3〜8) */
 export const RoadmapNodeSchema = z.object({
   /** 表示する時間ラベル。短い英数表記("3M"/"6M"/"1Y"/"2Y"/"3Y"/"5Y"/"10Y"/"NOW"/"GOAL"・specs §5-3) */
-  timeLabel: z.string().min(1).max(12),
+  timeLabel: z.string().min(1).max(24),
   /** バッジ等に出す説明的な期間表現。例: "今すぐ" "3ヶ月後" "目標" */
-  periodText: z.string().min(1).max(20),
-  title: z.string().min(1).max(40),
+  periodText: z.string().min(1).max(40),
+  title: z.string().min(1).max(80),
   /**
    * 具体性を担保するため min を 40 字に引き上げ(specs §2-4 / §4-1)。
-   * 数値・期限・手段のいずれかを必ず含むトーン規範は prompt 側で強制。
+   * 2026-06-02: max を 220 → 500 に緩和(AI が制限を守れず失敗するため)。
    */
-  description: z.string().min(40).max(220),
+  description: z.string().min(40).max(500),
   /** ノードの種類。配色(start=cyan, milestone=violet, goal=pink)に使う */
   kind: z.enum(["start", "milestone", "goal"]),
   /**
    * NOW ノード(timeLabel="NOW" / kind="start")に出す「今すぐの具体アクション」を
    * チェックリストとして集約する。旧 NextAction の代替(specs §3-6-2)。
    */
-  nowActions: z.array(z.string().min(1).max(160)).min(1).max(3).optional(),
+  nowActions: z.array(z.string().min(1).max(300)).min(1).max(3).optional(),
 });
 
 /** 進路候補(各案 1 件・タブのラベル兼ヘッダーになる) */
 export const PlanCandidateSchema = z.object({
-  /** タブのラベルにもなる(40 字) */
-  title: z.string().min(1).max(40),
-  /** 一覧での短文(60 字) */
-  shortSummary: z.string().min(1).max(60),
-  /** 詳細説明(200 字 ± 20・specs §2-4) */
-  detail: z.string().min(120).max(220),
+  /** タブのラベル(2026-06-02: 40 → 80 に緩和) */
+  title: z.string().min(1).max(80),
+  /** 一覧での短文(2026-06-02: 60 → 200 に緩和) */
+  shortSummary: z.string().min(1).max(200),
+  /** 詳細説明(2026-06-02: 220 → 500 に緩和) */
+  detail: z.string().min(80).max(500),
   /** マッチ度 0-100。バーの幅と数値表示に使う */
   matchPercent: z.number().int().min(0).max(100),
   /** 4 段階の実現可能性(specs §3-4) */
   feasibility: FeasibilitySchema,
-  /**
-   * feasibility != realistic のとき任意・very_challenging / extreme_effort で必須
-   * トーン規範は prompt 側(§4-4)で強制。
-   */
-  warning: z.string().min(20).max(160).optional(),
+  /** feasibility != realistic のとき任意(2026-06-02: 160 → 400 に緩和) */
+  warning: z.string().min(20).max(400).optional(),
   /** 最有力フラグ(初期表示タブの選択用途のみ・UI にリボンは出さない・specs §6-2) */
   isTop: z.boolean().optional(),
 });
 
 /** スキルの 1 項目(mustLearn の各エントリ・specs §3-5) */
 export const MustLearnItemSchema = z.object({
-  /** 学んでおくべき分野のタイトル(例: 「プログラミング言語(まずは TypeScript or Python)」) */
-  title: z.string().min(1).max(40),
-  /** なぜそれを学ぶか・どう学ぶかを 80 字前後で(specs §4-2) */
-  description: z.string().min(1).max(120),
+  /** 学んでおくべき分野のタイトル(2026-06-02: 40 → 80 に緩和) */
+  title: z.string().min(1).max(80),
+  /** なぜそれを学ぶか・どう学ぶかを 80 字前後で(2026-06-02: 120 → 300 に緩和) */
+  description: z.string().min(1).max(300),
 });
 
 /** スキルセクション(各案ごと・specs §3-5) */
@@ -100,11 +97,12 @@ export const PlanSkillsSchema = z.object({
   /** 学んでおくべき分野(0〜8 件可変・進路依存)。0 件時は UI 側で「特になし」表示 */
   mustLearn: z.array(MustLearnItemSchema).min(0).max(8),
   /** 業界の最新トレンド(AI 使いこなし等・1〜4 件) */
-  emergingSkills: z.array(z.string().min(1).max(40)).min(1).max(4),
-  /** おすすめ資格(0〜3 件・本当に必須なもののみ・0 件 OK) */
-  recommendedCerts: z.array(z.string().min(1).max(40)).min(0).max(3),
+  emergingSkills: z.array(z.string().min(1).max(80)).min(1).max(4),
+  /** おすすめ資格(0〜3 件・本当に必須なもののみ・0 件 OK)
+   * 2026-06-02: 上限 40 → 80 に緩和(資格名は長くなりがちで AI が守りきれない)。 */
+  recommendedCerts: z.array(z.string().min(1).max(80)).min(0).max(3),
   /** 既存の強み(MINDSET 由来のタグ・2〜5 件) */
-  strengths: z.array(z.string().min(1).max(20)).min(2).max(5),
+  strengths: z.array(z.string().min(1).max(40)).min(2).max(5),
 });
 
 /** 広告枠(各案ごと・MVP は固定バナー / 将来はアフィリエイト案件を流し込む) */
@@ -142,12 +140,12 @@ export const TraitSchema = z.object({
 
 /** ヒーロー(全案共通) */
 export const HeroSchema = z.object({
-  /** v2 新設: 結果画面メインキャッチ(AI 生成キャッチコピー 8〜40 字・specs §3-1) */
-  tagline: z.string().min(8).max(40),
-  /** 想定期間。例: "約3年" */
-  durationText: z.string().min(1).max(20),
-  /** ヒーロー要約(80〜180 字・specs §2-4) */
-  summary: z.string().min(80).max(180),
+  /** v2 新設: 結果画面メインキャッチ(2026-06-02: 上限 40 → 80 に緩和) */
+  tagline: z.string().min(8).max(80),
+  /** 想定期間(2026-06-02: 20 → 40 に緩和) */
+  durationText: z.string().min(1).max(40),
+  /** ヒーロー要約(2026-06-02: 上限 180 → 400 に緩和) */
+  summary: z.string().min(60).max(400),
   /** v2: schema 上は残置・UI 非表示(specs §2-5) */
   currentLabel: z.string().min(1).max(40).optional(),
   /** v2: schema 上は残置・UI 非表示(specs §2-5) */

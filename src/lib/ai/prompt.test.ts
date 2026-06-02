@@ -190,9 +190,16 @@ describe("buildPrompt — GOAL v2.1 学生フロー整形ガイド", () => {
     };
     const p = buildPrompt(a);
     expect(p).toContain("進学先・学部主軸");
-    expect(p).toContain("医学部 → 医療・看護・介護");
+    // 短縮版(2026-06-02): 「医学部・看護学部・薬学部 → 医療・看護・介護を最優先」のように
+    // 学部をまとめて列挙する記法に変更。重要な業界推論ルール(医学部・情報工・分野クロス)が
+    // 残っていることを個別に確認する。
+    expect(p).toContain("医学部");
+    expect(p).toContain("医療・看護・介護を最優先");
     expect(p).toContain("情報工学");
-    expect(p).toContain("「分からないので分かりません」と返さない");
+    // 短縮版(2026-06-02): 「と返さない」→「ではなく」表記に変更しつつ、
+    // 「分からないので分かりません」と「具体的な業界候補を提示」の意味は維持。
+    expect(p).toContain("「分からないので分かりません」");
+    expect(p).toContain("具体的な業界候補");
     expect(p).toContain("分野クロス志向");
   });
 
@@ -571,7 +578,9 @@ describe("buildPrompt — MINDSET v2 プロンプト整形ガイド(specs §8-5-
   it("(m-5) mindset_freenote の取り扱いガイドが含まれる(§7-4)", () => {
     const p = buildPrompt(baseMindset);
     expect(p).toContain("mindset_freenote");
-    expect(p).toContain("自由記述");
+    // 短縮版(2026-06-02): セクション見出しから「(性格・価値観の自由記述)」を削除した代わりに
+    // 補足対象の例示(完璧主義・HSP・夜型/朝型 等)で「選択肢で表現しきれなかった補足」の意味を担保。
+    expect(p).toContain("完璧主義");
   });
 
   it("(m-6) ORIGIN + GOAL + MINDSET の組み合わせ解釈の代表パターンが含まれる(§7-5)", () => {
