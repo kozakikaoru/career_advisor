@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
-import { PlanetField } from "@/components/ui/PlanetField";
+import { HeroBackdrop } from "@/components/ui/HeroBackdrop";
 
 export default function Home() {
   return (
@@ -21,13 +21,14 @@ export default function Home() {
 
       <main className="relative z-10 max-w-5xl mx-auto px-5">
         {/* Hero
-            - 主役は右下の巨大惑星 + その周りを公転する星々(PlanetField)
+            - 2026-06-03: 旧 PlanetField(公転惑星)はかおる FB で廃止 → 静止の HeroBackdrop に置換
+            - 動かないネビュラ + 控えめな固定光点だけで「占い・夜空」のトーンを保つ
             - 背景の遠い星々(光点)は layout の ambient StarField がレイヤー 0 で敷いているのでそちらに任せる
-            - section に overflow-hidden で PlanetField の見切れをローカルに閉じ込める */}
+            - section に overflow-hidden で背景の見切れをローカルに閉じ込める */}
         <section className="relative pt-20 pb-16 sm:pt-28 rise overflow-hidden">
-          {/* 惑星 + 軌道公転(右下に半分はみ出す配置は PlanetField 内で完結) */}
+          {/* 静止背景(動かない幻想オーラ + 装飾光点) */}
           <div className="absolute inset-0 -z-0 pointer-events-none">
-            <PlanetField />
+            <HeroBackdrop variant="top" />
           </div>
 
           <div className="relative">

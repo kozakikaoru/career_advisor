@@ -362,9 +362,11 @@ function RoadmapSvg({
         2026-06-02 かおる要望 #4:
         SVG <text> はビューボックスに比例縮小されるため、375px の端末では字が小さくなる(実測 ~7px)。
         ラベルを HTML 側にオーバーレイ表示することで CSS font-size を素直に使えるようにし、
-        モバイルでも text-xs(12px)以上を確保。デスクトップは text-sm(14px)。
-        位置はノード(x/400, y/160)を % に変換して absolute 配置。
-        SVG ノード(円)は引き続き SVG 側にあるので、絵的な位置関係は揃う。
+        モバイルでも判読できる十分なサイズを確保。
+
+        2026-06-03 追加調整(かおる要望 #4 リフィン):
+        - モバイル text-xs(12px) → text-sm(14px)、デスクトップ text-sm(14px) → text-base(16px)
+        - SVG の viewBox はそのまま(絵の位置は固定)・HTML 側だけ太らせる
        */}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         {nodes.map((n, i) => {
@@ -375,15 +377,15 @@ function RoadmapSvg({
           return (
             <span
               key={i}
-              className="absolute -translate-x-1/2 font-display tracking-wider text-xs sm:text-sm whitespace-nowrap"
+              className="absolute -translate-x-1/2 font-display tracking-wider text-sm sm:text-base font-medium whitespace-nowrap"
               style={{
                 left: `${leftPercent}%`,
                 top: `${topPercent}%`,
                 color: active ? "#e7ecff" : "#8a93b8",
-                opacity: active ? 1 : 0.55,
+                opacity: active ? 1 : 0.6,
                 transition: "color 0.4s ease, opacity 0.4s ease",
                 textShadow:
-                  "0 0 4px rgba(7,9,18,0.85), 0 1px 2px rgba(7,9,18,0.9)",
+                  "0 0 6px rgba(7,9,18,0.95), 0 0 2px rgba(7,9,18,0.95), 0 1px 2px rgba(7,9,18,0.9)",
               }}
             >
               {n.label}

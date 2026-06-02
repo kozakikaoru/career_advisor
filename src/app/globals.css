@@ -171,7 +171,8 @@ body {
 }
 
 /* かつての .grid-bg(中央放射グラデ + 縦横グリッド)は幻想テーマと不整合のため撤去。
-   背景は StarField(光点 + ネビュラ) + 各ページの PlanetField / WarpField に一任。 */
+   背景は共通の StarField(光点 + ネビュラ) + 各ヒーローの静止 HeroBackdrop に一任。
+   2026-06-03: 旧 PlanetField(右下公転惑星)/ WarpField(80 個流れる星)はかおる FB で廃止。 */
 
 /* =========================================================================
    星々が占う・幻想テーマ
@@ -286,234 +287,73 @@ body {
 }
 
 /* =========================================================================
-   PlanetField — トップヒーロー右下の「画面外にはみ出した大惑星 + 公転する星々」
-   - 親要素 .planet-field を hero 内の絶対配置レイヤに置く想定
-   - 惑星のサイズ・位置は CSS のみで完結(スマホでも崩れない)
-   - prefers-reduced-motion 時は軌道の公転を停止(惑星のリング呼吸は残す)
+   HeroBackdrop — トップ/結果ヒーロー用の「静止」幻想背景レイヤー
+   2026-06-03 PlanetField / WarpField の動きを廃止 → これに置換。
+   - 動かない radial-gradient のオーラ + 動かない装飾光点だけで構成
+   - prefers-reduced-motion でも常に同じ見た目(分岐不要)
    ========================================================================= */
-.planet-field {
+.hero-backdrop {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
 }
 
-/* 惑星 + 軌道リング + 公転星の「中心」コンテナ
-   - 親 (.planet-field) に対して右下に配置し、半分くらい外にはみ出させる
-   - 直径は min(viewport幅 * 0.95, 640px) を上限にして大きすぎないように制御 */
-.planet-field__core {
+.hero-backdrop__aura {
   position: absolute;
-  width: clamp(360px, 95vw, 640px);
-  height: clamp(360px, 95vw, 640px);
-  /* 中心を画面右下からオフセット。translate で半分外に出す。 */
-  right: 0;
-  bottom: 0;
-  transform: translate(40%, 38%);
+  inset: -10%;
+  /* background は variant ごとに inline で指定 */
+  filter: blur(0.5px);
 }
 
-/* スマホ縦長(モバイル)では惑星をさらに少しコンパクトに、見切れも控えめに */
-@media (max-width: 640px) {
-  .planet-field__core {
-    width: clamp(280px, 90vw, 460px);
-    height: clamp(280px, 90vw, 460px);
-    transform: translate(32%, 32%);
-  }
-}
-
-/* 惑星本体 — radial-gradient + 多段 box-shadow で発光リングを作る */
-.planet-field__planet {
+/* 装飾光点(共通) — 動かない丸い発光ドット */
+.hero-backdrop__sigil {
   position: absolute;
-  inset: 25%;
   border-radius: 50%;
-  background:
-    radial-gradient(
-      circle at 35% 30%,
-      rgba(244, 114, 182, 0.55) 0%,
-      rgba(168, 85, 247, 0.6) 32%,
-      rgba(58, 36, 120, 0.85) 62%,
-      rgba(7, 9, 18, 1) 92%
-    );
-  box-shadow:
-    /* 外側ハロー(紫) */ 0 0 80px 8px rgba(168, 85, 247, 0.28),
-    /* 外側ハロー(ピンク) */ 0 0 160px 20px rgba(244, 114, 182, 0.18),
-    /* 外側ハロー(シアン弱) */ 0 0 240px 40px rgba(34, 211, 238, 0.08),
-    /* インナー縁取り */ inset 0 0 60px 8px rgba(34, 211, 238, 0.18),
-    inset 0 0 120px 12px rgba(168, 85, 247, 0.16);
-  animation: planet-breathe 9s ease-in-out infinite;
-  will-change: transform, box-shadow;
+  pointer-events: none;
 }
 
-/* 惑星のリング(SF の土星リング感を薄く出す) */
-.planet-field__planet::before {
-  content: "";
-  position: absolute;
-  left: -22%;
-  right: -22%;
-  top: 44%;
-  height: 12%;
-  border-radius: 50%;
-  background: linear-gradient(
-    90deg,
-    rgba(34, 211, 238, 0) 0%,
-    rgba(34, 211, 238, 0.35) 30%,
-    rgba(244, 114, 182, 0.4) 55%,
-    rgba(168, 85, 247, 0.3) 75%,
+/* top: 右下に「遠い 1 等星」だけ静かに置く(惑星の代替・控えめ) */
+.hero-backdrop__sigil--planet {
+  right: 8%;
+  bottom: 18%;
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(
+    circle at 35% 35%,
+    rgba(255, 255, 255, 0.95),
+    rgba(244, 114, 182, 0.8) 50%,
     rgba(168, 85, 247, 0) 100%
   );
-  filter: blur(2px);
-  transform: rotate(-18deg);
-  opacity: 0.7;
+  box-shadow:
+    0 0 24px rgba(244, 114, 182, 0.45),
+    0 0 60px rgba(168, 85, 247, 0.3);
 }
 
-@keyframes planet-breathe {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow:
-      0 0 80px 8px rgba(168, 85, 247, 0.28),
-      0 0 160px 20px rgba(244, 114, 182, 0.18),
-      0 0 240px 40px rgba(34, 211, 238, 0.08),
-      inset 0 0 60px 8px rgba(34, 211, 238, 0.18),
-      inset 0 0 120px 12px rgba(168, 85, 247, 0.16);
-  }
-  50% {
-    transform: scale(1.025);
-    box-shadow:
-      0 0 100px 12px rgba(168, 85, 247, 0.36),
-      0 0 200px 26px rgba(244, 114, 182, 0.22),
-      0 0 300px 50px rgba(34, 211, 238, 0.12),
-      inset 0 0 70px 10px rgba(34, 211, 238, 0.22),
-      inset 0 0 140px 16px rgba(168, 85, 247, 0.2);
-  }
+/* top: 右上の小さな十字光点(占いの星座感) */
+.hero-backdrop__sigil--cross {
+  top: 18%;
+  right: 22%;
+  width: 4px;
+  height: 4px;
+  background: rgba(34, 211, 238, 0.9);
+  box-shadow:
+    0 0 10px rgba(34, 211, 238, 0.8),
+    0 0 24px rgba(34, 211, 238, 0.4);
 }
 
-/* 軌道リング — 公転軌道を薄い円で示す。少し楕円に潰して立体感を出す。 */
-.planet-field__orbit {
-  position: absolute;
+/* result: 中央の消失点ドット(動かない・WarpField の core 代替) */
+.hero-backdrop__sigil--core {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) rotateX(58deg);
-  border-radius: 50%;
-  border: 1px solid rgba(168, 85, 247, 0.1);
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.05) inset;
-  pointer-events: none;
-}
-
-/* 公転星のラッパー — このラッパー自身が惑星中心を回転する。
-   ラッパーは軌道直径と同じサイズの正方形で、中心を origin にして transform: rotate() */
-.planet-field__satellite-wrap {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) rotateX(58deg);
-  transform-origin: center center;
-  will-change: transform;
-}
-
-/* 公転星本体 — ラッパー回転に対して逆回転は不要(rotate のみで軌道に乗る) */
-.planet-field__satellite {
-  position: absolute;
-  /* ラッパーは正方形なので、top 0 / left 50% に置くと「軌道の真上」になる */
-  left: 50%;
-  top: 0;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-
-@keyframes planet-orbit {
-  from {
-    transform: translate(-50%, -50%) rotateX(58deg) rotateZ(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotateX(58deg) rotateZ(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .planet-field__satellite-wrap,
-  .planet-field__planet {
-    animation: none !important;
-  }
-}
-
-/* =========================================================================
-   WarpField — 結果ヒーロー用「奥→手前」遠近の流れ星空(ハイパースペース風)
-   ========================================================================= */
-.warp-field {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  /* 立体パースで奥行きをほんの少し補強(変化は控えめ) */
-  perspective: 800px;
-}
-
-/* 中央の消失点ヒント — うっすら光る点(必要以上に主張しない) */
-.warp-field__core {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  width: 5px;
+  height: 5px;
   background: rgba(231, 236, 255, 0.85);
   box-shadow:
-    0 0 12px rgba(231, 236, 255, 0.5),
+    0 0 14px rgba(231, 236, 255, 0.55),
     0 0 40px rgba(168, 85, 247, 0.35),
-    0 0 100px rgba(34, 211, 238, 0.2);
+    0 0 90px rgba(34, 211, 238, 0.2);
   transform: translate(-50%, -50%);
-  opacity: 0.55;
-  animation: warp-core-pulse 3.8s ease-in-out infinite;
-}
-@keyframes warp-core-pulse {
-  0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.9); }
-  50%      { opacity: 0.85; transform: translate(-50%, -50%) scale(1.15); }
-}
-
-/* 各星本体 — 中央(消失点)に絶対配置し、keyframes で外側に向かって流れる */
-.warp-field__streak {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 2px;
-  height: 2px;
-  border-radius: 99px;
-  /* keyframes 内で参照する CSS 変数のデフォルト値 */
-  --tx: 0vmax;
-  --ty: 0vmax;
-  --end-scale: 2;
-  /* 初期状態(opacity 0)— keyframes でフェードイン → アウト */
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
-@keyframes warp-flow {
-  0% {
-    transform: translate(-50%, -50%) translate(0, 0) scale(0.4);
-    opacity: 0;
-  }
-  10% {
-    /* ふっと光って出てくる(中央→少し外側) */
-    opacity: 0.95;
-  }
-  80% {
-    /* ほぼ画面端まで来た時点でまだ光ってる */
-    opacity: 0.9;
-  }
-  100% {
-    transform: translate(-50%, -50%) translate(var(--tx), var(--ty))
-      scale(var(--end-scale));
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .warp-field__streak,
-  .warp-field__core {
-    animation: none !important;
-  }
-  .warp-field__streak {
-    opacity: 0.4;
-  }
 }
 
 /* スターオーラ — ボタンなどの周辺をうっすら脈動光させる

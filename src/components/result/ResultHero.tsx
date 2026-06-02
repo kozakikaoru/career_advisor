@@ -1,19 +1,20 @@
 import type { Hero } from "@/lib/schema/result";
-import { WarpField } from "@/components/ui/WarpField";
+import { HeroBackdrop } from "@/components/ui/HeroBackdrop";
 
 /**
  * ヒーロー(全案共通)。
  * v2: tagline(AI 生成キャッチコピー)を大見出しで表示し、
  *     「○○から××へ」の動的表示は廃止(specs §3-1 / §6-3)。
- * v2.2: 結果画面は「奥→手前に流れる」遠近表現の WarpField を背景に敷く。
- *       「ロードマップを描いた=前に進んでいる」気持ちを演出。
+ * v2.2: 「奥→手前に流れる」遠近表現の WarpField を背景に敷いていた。
+ * 2026-06-03: WarpField(80 個流れる星)はかおる FB で廃止 → 静止の HeroBackdrop に置換。
+ *             「占い・夜空」のトーンは静止画ベースのオーラと中央消失点で踏襲。
  */
 export function ResultHero({ hero }: { hero: Hero }) {
   return (
     <section className="relative pt-14 pb-14 rise overflow-hidden">
-      {/* 結果ヒーロー専用の WarpField(奥から手前に流れる遠近表現) */}
+      {/* 静止背景(動かない幻想オーラ + 中央の消失点ドット) */}
       <div className="absolute inset-0 -z-0 pointer-events-none">
-        <WarpField />
+        <HeroBackdrop variant="result" />
       </div>
 
       <div className="relative">

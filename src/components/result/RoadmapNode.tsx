@@ -110,12 +110,18 @@ function NodeIcon({ node }: { node: RoadmapNodeType }) {
         星の上に乗る "1M" / "3M" 等のラベルが白文字×紫星で読みにくかったので、
         - 文字の背後に半透明の暗いカプセル(背景パネル色)を敷いて可読性を確保
         - 文字に薄い黒の縁取り(text-shadow を多方向に)も併用してコントラストを底上げ
+
+        2026-06-03 さらに調整:
+        - 文字色 ice → cyan/100 寄り(薄い水色)で星色との分離をさらに強める
+        - カプセル背景の暗さを bg/65 → bg/80 に上げて視認性を底上げ
+        - フチを line/40 → cyan/40 に変えてマイルストーン感を保つ
        */}
       <span
-        className="absolute z-10 font-display text-[0.65rem] font-bold text-ice leading-none px-1.5 py-0.5 rounded-md bg-bg/65 border border-line/40 backdrop-blur-[1px]"
+        className="absolute z-10 font-display text-[0.65rem] font-bold leading-none px-1.5 py-0.5 rounded-md bg-bg/80 border border-cyan/40 backdrop-blur-[1px]"
         style={{
+          color: "#cffafe",
           textShadow:
-            "0 0 2px rgba(7,9,18,0.95), 0 0 1px rgba(7,9,18,0.95), 0 1px 2px rgba(7,9,18,0.9)",
+            "0 0 2px rgba(7,9,18,1), 0 0 1px rgba(7,9,18,1), 0 1px 2px rgba(7,9,18,0.95)",
         }}
       >
         {node.timeLabel}
