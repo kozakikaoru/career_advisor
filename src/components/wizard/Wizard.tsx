@@ -14,8 +14,8 @@ import type { AnswerMap, AnswerValue } from "@/lib/schema/answers";
 import { ConsentGate } from "./ConsentGate";
 import { QuestionStep } from "./QuestionStep";
 import { ProgressBar } from "./ProgressBar";
+import { GeneratingView } from "./GeneratingView";
 import { Logo } from "@/components/ui/Logo";
-import { Loading } from "@/components/Loading";
 import { MonthlyLimitView } from "@/components/RateLimit/MonthlyLimitView";
 import { RateLimitView } from "@/components/RateLimit/RateLimitView";
 
@@ -493,7 +493,7 @@ export function Wizard() {
           </div>
         )}
 
-        {phase === "generating" && <Loading />}
+        {phase === "generating" && <GeneratingView />}
 
         {phase === "monthly_limit" && monthlyInfo && (
           <MonthlyLimitView

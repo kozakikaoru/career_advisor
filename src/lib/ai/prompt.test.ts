@@ -275,10 +275,10 @@ describe("buildPrompt — 結果 v2 / 3 案出力ガイド(specs/result-v2.md §
     expect(p).toContain("recommendedCerts");
   });
 
-  it("§4-3 ロードマップ時間粒度(基本 8 段固定 + 短縮可)の指示が含まれる", () => {
+  it("§4-3 ロードマップ時間粒度(7〜8 段で必ず構成)の指示が含まれる", () => {
     const p = buildPrompt({ age: 28, stage: "employed" });
-    expect(p).toContain("基本は **8 段固定**");
-    expect(p).toContain("NOW / 3M / 6M / 1Y / 2Y / 3Y / 5Y / GOAL");
+    expect(p).toContain("7〜8 段で必ず構成");
+    expect(p).toContain("NOW / 3M / 6M / 1Y / 18M / 2Y / 3Y / GOAL");
     expect(p).toContain("nowActions");
   });
 
