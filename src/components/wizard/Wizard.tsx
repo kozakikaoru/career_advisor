@@ -76,51 +76,58 @@ const DEV_MINDSET_DUMMY_ANSWERS: AnswerMap = {
 // TODO(temp): 確認完了後に削除予定(?dev=submit ショートカット)
 // MINDSET 最後の質問(mindset_freenote)まで自動入力して即「結果を生成する」を押せる状態で開始。
 // 既存 `?dev=mindset` が「MINDSET 15 問を手で入力」なのを、毎回の動作確認で更に時短するためのもの。
-// 「在職者(employed)・キャリアチェンジ志向(change → step_up → specialist)」をデフォルトペルソナとする。
-// definitions.ts の branch を実際に辿れる構成のみを含める(prior_work_exp は employed ルートでは
-// 通らないため含めない / visited 外の回答は pruneAnswers で送信時に落ちるが混乱を避ける)。
+// かおる本人ペルソナ(2026-06-02 反映):
+// 「30 歳・フリーランス・バックエンドエンジニア 5〜10 年 / 福岡 / 起業志向の career_change」
+// definitions.ts の branch を実際に辿れる構成のみを含める。
 const DEV_SUBMIT_PREFILL_ANSWERS: AnswerMap = {
-  // ===== ORIGIN(employed ルート)=====
-  age: 28,
-  stage: "employed",
-  employment_type: "fulltime",
-  current_job_field: "Webエンジニア",
-  years_employed: "3to5",
-  knowledge_fields: ["software_dev", "it_web"],
-  // current_income は ORIGIN 側(GOAL の goal_income とは値域が違うので注意)
-  current_income: "300to500",
-  education: "uni",
+  // ===== ORIGIN(freelance ルート)=====
+  age: 30,
+  stage: "freelance",
+  freelance_field: "バックエンドエンジニア",
+  years_employed: "5to10",
+  knowledge_fields: ["it_web", "software_dev", "data_ai"],
+  // ORIGIN の current_income(GOAL の goal_income とは値域が違う)
+  current_income: "500to700",
+  education: "voc", // 専門卒
   life_constraint: ["none"],
-  location: "metro",
+  location: "regional_city", // 福岡 = 政令市
   time_available: "1to3h",
-  // origin_freenote(MAY)は省略
+  origin_freenote:
+    "今の仕事に限界を感じていて、違う仕事がしたいと考えている。知識が活かせればいいが、エンジニアは知識の限界。",
 
-  // ===== GOAL(系統 A: change → step_up → specialist)=====
+  // ===== GOAL(系統 A: change → career_change → chg_target_field)=====
   change_intent: "change",
-  change_direction: "step_up",
-  step_up_target: "specialist",
-  goal_workstyle: ["company", "freelance"],
-  goal_income: "800to1200",
-  goal_horizon: "3y",
-  goal_start_timing: "within_3m",
-  goal_commit: "20to50",
-  // goal_freenote(MAY)は省略
+  change_direction: "career_change",
+  chg_target_field: [
+    "software_dev",
+    "data_ai",
+    "design_creative",
+    "other_chg",
+    "undecided",
+  ],
+  goal_workstyle: ["startup"],
+  goal_income: "1200to2000",
+  goal_horizon: "1y",
+  goal_start_timing: "within_1y",
+  goal_commit: "lt5",
+  goal_freenote:
+    "漠然と起業したいと思っているが内容は未定。自分のサービスのためなら開発業務も厭わないが、開発を生業にするのもなぁという感じ。趣味のカードゲームを活かして、デッキケース販売などを考えたこともあるが、資金がないことと、工場がうまく見つからず断念。なんでもやってみたい。",
 
   // ===== MINDSET(A〜E 群 14 問。最後の mindset_freenote だけ入力画面で表示)=====
-  leadership_role: "lead_neutral",
-  social_pref: "team_strong",
-  plan_style: "plan_balance",
-  unknown_field_jump: "jump_ok",
-  change_attitude: "change_welcome",
-  value_priority: ["growth", "freedom"],
-  meaning_priority: "balance",
-  competition_pref: "compete_motivated",
-  risk_pref: "risk_balance",
-  learning_depth: "mix_learning",
-  failure_recovery: "retry_fast",
-  location_preference: "keep_current",
-  remote_preference: "hybrid_remote",
-  wlb_priority: "wlb_balance",
+  leadership_role: "lead_want", // 取りたい
+  social_pref: "team_strong", // チーム
+  plan_style: "plan_first", // 計画派
+  unknown_field_jump: "jump_ok", // 抵抗少
+  change_attitude: "change_welcome", // 歓迎
+  value_priority: ["growth", "stability", "reward"], // 成長・安定・報酬
+  meaning_priority: "success_priority", // 成功寄り
+  competition_pref: "compete_motivated", // 燃える
+  risk_pref: "safe", // 安定
+  learning_depth: "wide_explore", // 広く試す
+  failure_recovery: "careful_after", // 引きずる
+  location_preference: "keep_current", // 今の地域維持
+  remote_preference: "flexible", // こだわらない
+  wlb_priority: "wlb_balance", // 同じくらい
   // mindset_freenote(MAY / 最後の質問)→ ここを入力画面で表示する
 };
 
