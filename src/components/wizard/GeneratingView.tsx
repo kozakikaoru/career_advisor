@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * 結果生成中のローディング画面(全部盛り版)。
+ * 結果生成中のローディング画面(「星々が占う」幻想版)。
  *
- * Gemini 2.5 Pro での生成は 60〜90 秒かかる前提。
+ * Gemini 2.5 Pro での生成は実測 127〜137 秒。
  * ユーザーが「動いてる?」と不安にならず、待ち時間自体が楽しめる体験を目指す。
  *
  * 構成要素:
- * 1. 疑似プログレスバー(時間ベース: 0% → 95% を 60 秒で / 完了時 100% へジャンプ)
- * 2. ステップメッセージ切替(地図・進路の世界観 / aria-live 対応)
+ * 1. 疑似プログレスバー(時間ベース: 0% → 95% を 150 秒で / 完了時 100% へスムーズ着地)
+ * 2. ステップメッセージ切替(占星術・星見・地図メタファ / aria-live 対応)
  * 3. アニメーション全部盛り
  *    - SVG ロードマップを徐々に描画(stroke-dashoffset)
  *    - ノード(目印)が順に点灯
@@ -19,14 +19,16 @@ import { useEffect, useRef, useState } from "react";
  *    - 周回する衛星(SVG <animateTransform>)
  *    - プログレスバー上の流れるシマー
  *    - ふわふわ漂うパーティクル
+ * 4. 100% 達成演出(success フェーズ): 全ノードのパルス + 道筋の発光 + 中央フラッシュ
  *
  * Props:
- * - status: "loading" | "error"
- *   "error" になるとバーが赤系で停止し、メッセージも切り替わる。
+ * - status: "loading" | "success" | "error"
+ *   "success" — 結果取得完了時。1.5〜2s の達成演出を見せてから親が router.push する。
+ *   "error"   — バーが赤系で停止し、メッセージも切り替わる。
  *   ?dev=submit で実機確認可能。
  */
 
-type Status = "loading" | "error";
+type Status = "loading" | "success" | "error";
 
 type Step = {
   /** この step に切り替わる秒数(progress fraction 0-1 ベース) */
@@ -39,52 +41,82 @@ type Step = {
 
 /**
  * フェーズ別メッセージ。プログレス(0-1)に対する閾値で切り替わる。
- * 60〜90 秒の体感を「ちょうど 5 段階で変化」させて単調さを消す。
- * career-advisor の世界観(進路=地図・ロードマップ)に統一。
+ * 実測 127〜137 秒の体感を「9 段階で変化」させて単調さを消す。
+ * 占星術・星見・地図メタファで世界観を統一(「星々が占う」)。
  */
 const STEPS: Step[] = [
   {
     fromFraction: 0,
-    message: "あなたの回答を読み解いています…",
-    hint: "現在地を地図にプロットしています",
+    message: "星々があなたの声を聞いています…",
+    hint: "夜空に回答が届きました",
   },
   {
-    fromFraction: 0.15,
-    message: "業界事情と相場を照らし合わせています…",
-    hint: "実在する道筋を絞り込み中",
+    fromFraction: 0.1,
+    message: "現在地の座標を読み解いています…",
+    hint: "あなたという星を地図にプロット",
+  },
+  {
+    fromFraction: 0.22,
+    message: "業界の星図と照らし合わせています…",
+    hint: "実在する航路だけを残しています",
   },
   {
     fromFraction: 0.35,
-    message: "3 本のロードマップを設計しています…",
+    message: "あなたの強みの輝きを見つけています…",
+    hint: "回答の星々を結んでいます",
+  },
+  {
+    fromFraction: 0.48,
+    message: "3 つの航路を描き始めました…",
     hint: "本命・別解・冒険ルートを並行構築",
   },
   {
     fromFraction: 0.6,
-    message: "具体的なアクションに落とし込んでいます…",
-    hint: "最初の一歩を描き出しています",
+    message: "それぞれの航路の現実味を吟味しています…",
+    hint: "占いの結果を磨き上げています",
+  },
+  {
+    fromFraction: 0.72,
+    message: "最初の一歩を星空に刻んでいます…",
+    hint: "明日からできるアクションを編集中",
   },
   {
     fromFraction: 0.85,
-    message: "最終調整中…",
-    hint: "あと少しで地図が完成します",
+    message: "失敗の予感も読み込んでいます…",
+    hint: "注意すべき星の動きを記録",
+  },
+  {
+    fromFraction: 0.95,
+    message: "地図の最終調整中…",
+    hint: "もうすぐ地図が完成します",
   },
 ];
 
 /**
+ * 0 → 0.95 まで到達するのに要する秒数。
+ * 実測(Gemini 2.5 Pro)は成功時 127s / 失敗時 137s 程度なので、それを内包する
+ * 150 秒(2.5 分)に拡張。これより遅い時は 0.95 → 0.99 にゆっくり漸近して粘る。
+ */
+const PROGRESS_TO_95_SEC = 150;
+
+/**
  * 疑似プログレスを返すフック。
  *
- * - mounted から 60 秒で 0 → 95% に到達(easeOutQuad っぽい逓減カーブ)
- * - 60 秒超えても 95% でゆっくり前進(99% に漸近)し、決して 100% に行かない
+ * - mounted から PROGRESS_TO_95_SEC 秒で 0 → 95% に到達(easeOutQuad っぽい逓減カーブ)
+ * - それ以降は 95% でゆっくり前進(99% に漸近)し、決して 100% に行かない
  * - status="error" になった瞬間に止まる(値はそのまま保持)
- * - done=true(親が完了を通知)で 100% にスムーズ着地
+ * - status="success" で 100% にスムーズ着地(easeOutCubic / 500ms)
  *
  * 戻り値: 0..1 の fraction
  */
-function useFakeProgress(status: Status, done: boolean): number {
-  const [fraction, setFraction] = useState(0);
+function useFakeProgress(status: Status): number {
+  // 初期値: success フェーズで突然マウントされた場合(?dev=success で直接開いた等)、
+  // fraction=0 から finale 演出が始まるのは違和感あるので 0.95 から始める。
+  // 通常運用では loading フェーズから順に進むので fraction は既に高い値になっている。
+  const [fraction, setFraction] = useState(status === "success" ? 0.95 : 0);
   const startRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
-  const lastRef = useRef(0);
+  const lastRef = useRef(status === "success" ? 0.95 : 0);
 
   useEffect(() => {
     if (status === "error") {
@@ -96,45 +128,48 @@ function useFakeProgress(status: Status, done: boolean): number {
       return;
     }
 
-    if (done) {
-      // 完了通知が来たら 100% へ短時間でスムーズ着地。
-      // CSS transition 任せにせず、最後だけ JS で 250ms ほど補間する。
+    if (status === "success") {
+      // 完了通知が来たら 100% へスムーズ着地。
+      // 500ms かけて easeOutCubic で 現在値 → 1.0 に。
+      // - 通常運用: loading フェーズの末期(0.9〜0.99 付近)から呼ばれる
+      // - dev 検証: ?dev=success で直接マウントされた場合は 0.95 スタート
+      //
+      // setInterval ベース(16ms tick)で動かす。requestAnimationFrame だと
+      // タブ非アクティブ時やバックグラウンドブラウザで動作が止まる/極端に遅くなるが、
+      // setInterval は止まらないので「結果取得完了 → 短時間で 100% 着地」が確実に走る。
       const from = lastRef.current;
       const start = performance.now();
-      const duration = 350;
-      const tick = (now: number) => {
+      const duration = 500;
+      const intervalId = window.setInterval(() => {
+        const now = performance.now();
         const t = Math.min(1, (now - start) / duration);
         // easeOutCubic
         const eased = 1 - Math.pow(1 - t, 3);
         const v = from + (1 - from) * eased;
         lastRef.current = v;
         setFraction(v);
-        if (t < 1) {
-          rafRef.current = requestAnimationFrame(tick);
+        if (t >= 1) {
+          window.clearInterval(intervalId);
         }
-      };
-      rafRef.current = requestAnimationFrame(tick);
+      }, 16);
       return () => {
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
+        window.clearInterval(intervalId);
       };
     }
 
-    // 通常進行: 60 秒で 0 → 0.95, それ以降は 0.99 に漸近
+    // 通常進行: PROGRESS_TO_95_SEC 秒で 0 → 0.95, それ以降は 0.99 に漸近
     const tick = (now: number) => {
       if (startRef.current === null) startRef.current = now;
       const elapsed = (now - startRef.current) / 1000; // sec
       let v: number;
-      if (elapsed <= 60) {
+      if (elapsed <= PROGRESS_TO_95_SEC) {
         // easeOutQuad: 序盤少し早く・後半ゆっくり、で「待ってる感」を緩和
-        const t = elapsed / 60;
+        const t = elapsed / PROGRESS_TO_95_SEC;
         v = (1 - Math.pow(1 - t, 2)) * 0.95;
       } else {
-        // 60s 以降は 0.95 → 0.99 へゆっくり漸近(30 秒で 0.99 弱に)
-        const extra = elapsed - 60;
-        v = 0.95 + (1 - Math.exp(-extra / 30)) * 0.04;
+        // 上限を超えたら 0.95 → 0.99 へゆっくり漸近(60 秒で 0.99 弱に)
+        const extra = elapsed - PROGRESS_TO_95_SEC;
+        v = 0.95 + (1 - Math.exp(-extra / 60)) * 0.04;
       }
       // 単調増加を保証(タブ非アクティブ→復帰時の巻き戻し防止)
       v = Math.max(lastRef.current, v);
@@ -149,7 +184,7 @@ function useFakeProgress(status: Status, done: boolean): number {
         rafRef.current = null;
       }
     };
-  }, [status, done]);
+  }, [status]);
 
   return fraction;
 }
@@ -166,9 +201,12 @@ function useFakeProgress(status: Status, done: boolean): number {
 function RoadmapSvg({
   progress,
   error,
+  finale,
 }: {
   progress: number;
   error: boolean;
+  /** 100% 達成演出中: 全ノードが大きくパルス + 道筋が眩しく光る */
+  finale?: boolean;
 }) {
   // path 長さ(おおよそ。SVG getTotalLength でも取れるが、固定パスなので定数で十分)
   // 実際の path で計算しなおすこともできるが、500 でほぼ収まる長さに設計してある。
@@ -239,31 +277,51 @@ function RoadmapSvg({
         d="M 40 120 Q 90 30 130 60 T 210 110 Q 260 0 300 50 T 370 90"
         fill="none"
         stroke={stroke}
-        strokeWidth="3.5"
+        strokeWidth={finale ? 4.5 : 3.5}
         strokeLinecap="round"
         strokeDasharray={PATH_LENGTH}
         strokeDashoffset={PATH_LENGTH - drawn}
         filter="url(#road-glow)"
         style={{
-          transition: "stroke-dashoffset 0.25s linear",
+          transition:
+            "stroke-dashoffset 0.25s linear, stroke-width 0.6s ease-out",
         }}
       />
+      {/* finale 演出: 道筋に沿って眩しいオーバーレイ線を 1 本被せる */}
+      {finale && (
+        <path
+          d="M 40 120 Q 90 30 130 60 T 210 110 Q 260 0 300 50 T 370 90"
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.9)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          filter="url(#road-glow)"
+          style={{ animation: "finale-path 1.4s ease-out forwards" }}
+        />
+      )}
 
       {/* ノード(目印) */}
       {nodes.map((n, i) => {
         const active = progress >= n.from;
         return (
           <g key={i} style={{ transition: "opacity 0.4s ease" }}>
-            {/* 外側の発光ハロー(active 時のみ) */}
+            {/* 外側の発光ハロー(active 時のみ・finale 時は大きく派手に) */}
             {active && !error && (
               <circle
                 cx={n.x}
                 cy={n.y}
-                r="12"
-                fill="rgba(168, 85, 247, 0.18)"
+                r={finale ? 16 : 12}
+                fill={
+                  finale
+                    ? "rgba(244, 114, 182, 0.32)"
+                    : "rgba(168, 85, 247, 0.18)"
+                }
                 style={{
-                  animation: "node-halo 2.4s ease-in-out infinite",
+                  animation: finale
+                    ? "finale-node 1.4s ease-out forwards"
+                    : "node-halo 2.4s ease-in-out infinite",
                   transformOrigin: `${n.x}px ${n.y}px`,
+                  animationDelay: finale ? `${i * 0.08}s` : undefined,
                 }}
               />
             )}
@@ -453,22 +511,41 @@ function Particles() {
 }
 
 export function GeneratingView({ status = "loading" }: { status?: Status }) {
-  // done フラグは将来的に親から「生成完了」を通知できるようにするためだが、
-  // 現状 Wizard 側は完了したら router.push で結果ページへ遷移するため、
-  // ここでは常に false。エラーは status="error" で受ける。
-  const done = false;
-  const fraction = useFakeProgress(status, done);
+  const fraction = useFakeProgress(status);
   const error = status === "error";
+  const success = status === "success";
   const percent = Math.min(100, Math.round(fraction * 100));
 
   // 現在のステップ(progress fraction ベース)。エラー時は固定文言。
+  // 100% 到達時は専用メッセージ。
   const currentStep =
-    [...STEPS].reverse().find((s) => fraction >= s.fromFraction) ?? STEPS[0];
+    success && fraction >= 0.999
+      ? {
+          fromFraction: 1,
+          message: "地図が完成しました ✦",
+          hint: "結果画面へご案内します…",
+        }
+      : ([...STEPS].reverse().find((s) => fraction >= s.fromFraction) ??
+        STEPS[0]);
+
+  // 100% 達成演出フラグ: success かつ fraction が十分に上がってから発火
+  const finale = success && fraction >= 0.995;
 
   return (
     <div className="relative rise">
+      {/* 100% 到達時の全画面フラッシュ(success 時に一瞬眩しく光る) */}
+      {finale && (
+        <div
+          className="fixed inset-0 z-50 pointer-events-none gen-flash"
+          aria-hidden="true"
+        />
+      )}
       {/* 画面コンテナ: グリッド背景 + パーティクル */}
-      <div className="relative glow-card rounded-3xl px-6 py-10 sm:px-10 sm:py-14 overflow-hidden">
+      <div
+        className={`relative glow-card rounded-3xl px-6 py-10 sm:px-10 sm:py-14 overflow-hidden ${
+          finale ? "gen-finale" : ""
+        }`}
+      >
         {/* 背景: 脈動するドットグリッド(globals.css の grid-bg を上書きせず別レイヤで) */}
         <div
           className="absolute inset-0 opacity-60"
@@ -553,8 +630,8 @@ export function GeneratingView({ status = "loading" }: { status?: Status }) {
           </div>
 
           {/* ロードマップ SVG */}
-          <div className="mb-7 px-2">
-            <RoadmapSvg progress={fraction} error={error} />
+          <div className={`mb-7 px-2 ${finale ? "gen-roadmap-finale" : ""}`}>
+            <RoadmapSvg progress={fraction} error={error} finale={finale} />
           </div>
 
           {/* メッセージ(aria-live でステップ切替を読み上げ) */}
@@ -563,7 +640,11 @@ export function GeneratingView({ status = "loading" }: { status?: Status }) {
             aria-live="polite"
             aria-atomic="true"
           >
-            <h2 className="font-display text-xl sm:text-2xl font-semibold neon-text mb-2">
+            <h2
+              className={`font-display text-xl sm:text-2xl font-semibold neon-text mb-2 ${
+                finale ? "gen-finale-title" : ""
+              }`}
+            >
               {error ? "通信エラーが発生しました" : currentStep.message}
             </h2>
             {!error && currentStep.hint && (
@@ -634,7 +715,9 @@ export function GeneratingView({ status = "loading" }: { status?: Status }) {
             <p className="mt-5 text-center text-[0.7rem] text-mute/70 leading-relaxed">
               {error
                 ? "回答は保持しています。下のボタンから再試行できます。"
-                : "60〜90 秒ほどかかります。タブを閉じずにお待ちください。"}
+                : success
+                  ? "もうすぐ結果画面に切り替わります…"
+                  : "2 〜 3 分ほどかかります。タブを閉じずにお待ちください。"}
             </p>
           </div>
         </div>
@@ -688,12 +771,62 @@ export function GeneratingView({ status = "loading" }: { status?: Status }) {
             opacity: 1;
           }
         }
+        /* 100% 達成演出: 全ノード一斉パルス */
+        @keyframes finale-node {
+          0%   { transform: scale(0.85); opacity: 0.4; }
+          50%  { transform: scale(1.7);  opacity: 0.95; }
+          100% { transform: scale(1.0);  opacity: 0.55; }
+        }
+        /* 100% 達成演出: 道筋オーバーレイ線を白く光らせて消える */
+        @keyframes finale-path {
+          0%   { opacity: 0; stroke-width: 1; filter: blur(0px); }
+          30%  { opacity: 1; stroke-width: 3; filter: blur(0.5px); }
+          100% { opacity: 0; stroke-width: 1; filter: blur(2px); }
+        }
+        /* 100% 達成演出: コンテナ枠が呼吸 */
+        .gen-finale {
+          animation: finale-card 1.6s ease-out;
+        }
+        @keyframes finale-card {
+          0%   { box-shadow: 0 20px 60px -30px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04); }
+          40%  {
+            box-shadow:
+              0 0 80px -10px rgba(244, 114, 182, 0.55),
+              0 0 120px -10px rgba(168, 85, 247, 0.45),
+              inset 0 1px 0 rgba(255,255,255,0.12);
+          }
+          100% { box-shadow: 0 20px 60px -30px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04); }
+        }
+        /* 100% 達成演出: タイトル一瞬きらめき */
+        .gen-finale-title {
+          animation: finale-title 1.4s ease-out;
+        }
+        @keyframes finale-title {
+          0%   { letter-spacing: normal; filter: brightness(1) drop-shadow(0 0 0 transparent); }
+          40%  { letter-spacing: 0.04em; filter: brightness(1.4) drop-shadow(0 0 18px rgba(244, 114, 182, 0.5)); }
+          100% { letter-spacing: normal; filter: brightness(1) drop-shadow(0 0 0 transparent); }
+        }
+        /* 100% 達成演出: 画面全体フラッシュ */
+        .gen-flash {
+          background: radial-gradient(60% 50% at 50% 50%, rgba(255,255,255,0.55), rgba(244, 114, 182, 0.2) 40%, transparent 70%);
+          animation: gen-flash-anim 1.6s ease-out forwards;
+        }
+        @keyframes gen-flash-anim {
+          0%   { opacity: 0; }
+          20%  { opacity: 0.75; }
+          100% { opacity: 0; }
+        }
         /* reduced-motion を尊重 — 振幅を抑える(完全停止ではなく、過度な動きを抑える) */
         @media (prefers-reduced-motion: reduce) {
           [aria-hidden="true"] *,
           [aria-hidden="true"] {
             animation-duration: 6s !important;
             animation-iteration-count: 1 !important;
+          }
+          .gen-finale,
+          .gen-finale-title,
+          .gen-flash {
+            animation: none !important;
           }
         }
       `}</style>

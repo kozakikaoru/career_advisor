@@ -25,9 +25,15 @@ type Phase =
   | "consent"
   | "asking"
   | "generating"
+  | "finalizing"
   | "error"
   | "monthly_limit"
   | "rate_limit";
+
+/** 100% 達成演出から router.push までのホールド秒数(ms)。
+ *  「結果完成 → 眩しいフラッシュ → 結果画面」の流れを体感させるため、
+ *  バーが 100% に着地する 500ms + 演出を見せる時間として 1.8s 取る。 */
+const FINALIZE_HOLD_MS = 1800;
 
 /**
  * /api/generate がレート制限関連エラーで返してきた JSON 形(API 側と一致させる)。
@@ -169,10 +175,20 @@ export function Wizard() {
   // (本番にバレてもダミーデータが表示されるだけで悪用余地なし)
   const isDevMonthly = devMode === "ratelimit_monthly";
   const isDevRate = devMode === "ratelimit_429";
+  // 生成中ローディング画面を単独確認するための dev フラグ。
+  // `?dev=loading`  → loading 状態(2.5 分かけて 0→95%)
+  // `?dev=success`  → finalizing 状態(95→100% 演出)
+  // `?dev=load_err` → エラー停止状態
+  // (本番にバレても画面が表示されるだけで悪用余地なし)
+  const isDevLoading = devMode === "loading";
+  const isDevSuccess = devMode === "success";
+  const isDevLoadErr = devMode === "load_err";
 
   const [phase, setPhase] = useState<Phase>(() => {
     if (isDevMonthly) return "monthly_limit";
     if (isDevRate) return "rate_limit";
+    if (isDevLoading || isDevLoadErr) return "generating";
+    if (isDevSuccess) return "finalizing";
     // TODO(temp): 確認完了後に削除予定 — dev=submit は ConsentGate を自動通過(毎回チェックを入れる手間を省くため)
     if (isDevSubmit) return "asking";
     return "consent";
@@ -227,6 +243,68 @@ export function Wizard() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentId, phase]);
+
+  // 診断中の離脱防止。
+  // - asking / generating / finalizing フェーズで離脱を試みたら警告する
+  // - beforeunload(タブを閉じる・リロード)→ ブラウザネイティブの確認ダイアログ
+  // - popstate(ブラウザバック)→ confirm() を出し、キャンセル時は history.pushState で URL を戻す
+  //
+  // 注意点:
+  // - consent / monthly_limit / rate_limit / error / 結果画面遷移後 は対象外(ユーザーが意図的に出ようとしている / 出てもよい)
+  // - dev=loading / dev=success / dev=load_err はガード無効(画面確認のため何度も URL を切り替える)
+  // - dev=submit / dev=mindset は実際の診断フローと近いのでガード有効(開発時に邪魔なら確認ダイアログで「離脱」を選べばよい)
+  // - phase 遷移で結果画面 router.push() の直前に「ガードを外す」必要は無い(結果画面に遷移すると Wizard 自体が unmount され useEffect の cleanup でガードが外れるため)
+  const isDevGenView = isDevLoading || isDevSuccess || isDevLoadErr;
+  const shouldGuardLeave =
+    !isDevGenView &&
+    (phase === "asking" || phase === "generating" || phase === "finalizing");
+
+  useEffect(() => {
+    if (!shouldGuardLeave) return;
+
+    // 1) beforeunload — タブを閉じる・リロード時
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Chrome は returnValue を空文字でも要求する。
+      // 表示される文言は最近のブラウザではカスタマイズ不能でブラウザ規定のもの。
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    // 2) popstate — ブラウザバック / 進む
+    // history に「現在地」のダミーエントリを 1 つ積んでおき、戻られたら confirm を出し、
+    // 取り消しなら pushState で再度ダミーを積み直す。
+    // (Next.js Router の back() を奪うのは難しいので、ブラウザ操作レベルでガードする)
+    const guardKey = "__nexus_wizard_guard__";
+    try {
+      window.history.pushState({ [guardKey]: true }, "");
+    } catch {
+      /* SSR や iframe では失敗するが、その場合は単に保護できないだけ */
+    }
+    const onPopState = () => {
+      const ok = window.confirm(
+        "診断中です。離脱すると入力した回答は失われます。本当に戻りますか?",
+      );
+      if (!ok) {
+        // 戻る操作を打ち消すため、再度ダミーを積み直す
+        try {
+          window.history.pushState({ [guardKey]: true }, "");
+        } catch {
+          /* 失敗しても致命ではない */
+        }
+      } else {
+        // ユーザーが「OK」(離脱)を選んだので、もう一度戻して履歴から完全に離脱
+        // (ダミーを積んだぶんを消費するため pop 相当に戻す)
+        window.history.back();
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [shouldGuardLeave]);
 
   const question = getQuestion(set, currentId);
 
@@ -384,7 +462,15 @@ export function Wizard() {
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as { id?: string };
       if (!data.id) throw new Error("no id");
-      router.push(`/r/${data.id}`);
+      // 100% 達成演出を見せてから結果画面に遷移する。
+      // - GeneratingView の status を "success" に切り替えると、useFakeProgress が
+      //   500ms かけて 100% に着地し、finale 演出(全ノードパルス・道筋フラッシュ・
+      //   コンテナ呼吸・タイトルきらめき・画面フラッシュ)が一気に発火する。
+      // - その後 FINALIZE_HOLD_MS の間ホールドしてから router.push する。
+      setPhase("finalizing");
+      window.setTimeout(() => {
+        router.push(`/r/${data.id}`);
+      }, FINALIZE_HOLD_MS);
     } catch {
       setPhase("error");
     }
@@ -493,7 +579,22 @@ export function Wizard() {
           </div>
         )}
 
-        {phase === "generating" && <GeneratingView />}
+        {/* 同じインスタンスを使い回し、フェーズに応じて status を切り替える。
+            こうすることで useFakeProgress 内の lastRef / state がリセットされず、
+            loading の進捗(例: 96%)から finalizing(success)で 100% にスムーズ着地できる。
+            別 jsx 節に分けると React は別コンポーネントとして unmount→mount してしまい、
+            fraction が 0 にリセットされてしまう。 */}
+        {(phase === "generating" || phase === "finalizing") && (
+          <GeneratingView
+            status={
+              phase === "finalizing"
+                ? "success"
+                : isDevLoadErr
+                  ? "error"
+                  : "loading"
+            }
+          />
+        )}
 
         {phase === "monthly_limit" && monthlyInfo && (
           <MonthlyLimitView
