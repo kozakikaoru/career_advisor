@@ -9,6 +9,7 @@ import {
   getProgress,
   pruneAnswers,
 } from "@/lib/questions";
+import type { QuestionSet } from "@/lib/questions";
 import type { AnswerMap, AnswerValue } from "@/lib/schema/answers";
 import { ConsentGate } from "./ConsentGate";
 import { QuestionStep } from "./QuestionStep";
@@ -72,31 +73,126 @@ const DEV_MINDSET_DUMMY_ANSWERS: AnswerMap = {
   goal_commit: "lt5",
 };
 
+// TODO(temp): 確認完了後に削除予定(?dev=submit ショートカット)
+// MINDSET 最後の質問(mindset_freenote)まで自動入力して即「結果を生成する」を押せる状態で開始。
+// 既存 `?dev=mindset` が「MINDSET 15 問を手で入力」なのを、毎回の動作確認で更に時短するためのもの。
+// 「在職者(employed)・キャリアチェンジ志向(change → step_up → specialist)」をデフォルトペルソナとする。
+// definitions.ts の branch を実際に辿れる構成のみを含める(prior_work_exp は employed ルートでは
+// 通らないため含めない / visited 外の回答は pruneAnswers で送信時に落ちるが混乱を避ける)。
+const DEV_SUBMIT_PREFILL_ANSWERS: AnswerMap = {
+  // ===== ORIGIN(employed ルート)=====
+  age: 28,
+  stage: "employed",
+  employment_type: "fulltime",
+  current_job_field: "Webエンジニア",
+  years_employed: "3to5",
+  knowledge_fields: ["software_dev", "it_web"],
+  // current_income は ORIGIN 側(GOAL の goal_income とは値域が違うので注意)
+  current_income: "300to500",
+  education: "uni",
+  life_constraint: ["none"],
+  location: "metro",
+  time_available: "1to3h",
+  // origin_freenote(MAY)は省略
+
+  // ===== GOAL(系統 A: change → step_up → specialist)=====
+  change_intent: "change",
+  change_direction: "step_up",
+  step_up_target: "specialist",
+  goal_workstyle: ["company", "freelance"],
+  goal_income: "800to1200",
+  goal_horizon: "3y",
+  goal_start_timing: "within_3m",
+  goal_commit: "20to50",
+  // goal_freenote(MAY)は省略
+
+  // ===== MINDSET(A〜E 群 14 問。最後の mindset_freenote だけ入力画面で表示)=====
+  leadership_role: "lead_neutral",
+  social_pref: "team_strong",
+  plan_style: "plan_balance",
+  unknown_field_jump: "jump_ok",
+  change_attitude: "change_welcome",
+  value_priority: ["growth", "freedom"],
+  meaning_priority: "balance",
+  competition_pref: "compete_motivated",
+  risk_pref: "risk_balance",
+  learning_depth: "mix_learning",
+  failure_recovery: "retry_fast",
+  location_preference: "keep_current",
+  remote_preference: "hybrid_remote",
+  wlb_priority: "wlb_balance",
+  // mindset_freenote(MAY / 最後の質問)→ ここを入力画面で表示する
+};
+
+// TODO(temp): 確認完了後に削除予定 — ?dev=submit 用の開始質問 ID(MINDSET の最終問)
+const DEV_SUBMIT_START_ID = "mindset_freenote";
+
+// TODO(temp): 確認完了後に削除予定 — ?dev=submit 用の history(訪問済み履歴)を構築。
+// firstId から answers を辿り、開始位置の手前までの ID 列を返す(順序付き)。
+// 開始位置 ID 自体は含めない(currentId は別途 state で保持される)。
+// 開始位置に到達できなかった場合は履歴を返さない(getVisitedIds と同様にループガード付き)。
+function buildHistoryUpTo(
+  set: QuestionSet,
+  answers: AnswerMap,
+  targetId: string,
+): string[] {
+  const out: string[] = [];
+  let id: string | null = set.firstId;
+  const limit = set.questions.length + 1;
+  for (let i = 0; id && i < limit; i++) {
+    if (id === targetId) return out;
+    if (out.includes(id)) return out; // 循環ガード
+    out.push(id);
+    id = getNextQuestionId(set, id, answers);
+  }
+  return out;
+}
+
 export function Wizard() {
   const router = useRouter();
   // TODO(temp): MINDSET 確認完了後に削除予定 — searchParams 取得は通常診断には不要
   const searchParams = useSearchParams();
   const devMode = searchParams?.get("dev");
-  const isDevMindset = devMode === "mindset";
+  // TODO(temp): 確認完了後に削除予定 — `?dev=submit` は最優先(prefill 済みで MINDSET 最後の質問から開始)。
+  //   `?dev=mindset`(MINDSET 先頭から開始)と同時指定された場合も submit が優先される。
+  const isDevSubmit = devMode === "submit";
+  const isDevMindset = !isDevSubmit && devMode === "mindset";
   // レート制限の 503 / 429 画面を単独確認するための dev フラグ。
   // `?dev=ratelimit_monthly` → 月次上限画面 / `?dev=ratelimit_429` → 短期窓レート画面
   // (本番にバレてもダミーデータが表示されるだけで悪用余地なし)
   const isDevMonthly = devMode === "ratelimit_monthly";
   const isDevRate = devMode === "ratelimit_429";
 
-  const [phase, setPhase] = useState<Phase>(
-    isDevMonthly ? "monthly_limit" : isDevRate ? "rate_limit" : "consent",
-  );
-  const [consent, setConsent] = useState(false);
-  // TODO(temp): MINDSET 確認完了後に削除予定 — dev=mindset 時は ORIGIN/GOAL のダミー値を投入
-  const [answers, setAnswers] = useState<AnswerMap>(() =>
-    isDevMindset ? { ...DEV_MINDSET_DUMMY_ANSWERS } : {},
-  );
-  // TODO(temp): MINDSET 確認完了後に削除予定 — dev=mindset 時は MINDSET 先頭から開始
-  const [currentId, setCurrentId] = useState<string>(
-    isDevMindset ? DEV_MINDSET_START_ID : set.firstId,
-  );
-  const [history, setHistory] = useState<string[]>([]);
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (isDevMonthly) return "monthly_limit";
+    if (isDevRate) return "rate_limit";
+    // TODO(temp): 確認完了後に削除予定 — dev=submit は ConsentGate を自動通過(毎回チェックを入れる手間を省くため)
+    if (isDevSubmit) return "asking";
+    return "consent";
+  });
+  // TODO(temp): 確認完了後に削除予定 — dev=submit は consent=true として開始(submit() の二重ガードを通すため)
+  const [consent, setConsent] = useState(isDevSubmit);
+  // TODO(temp): 確認完了後に削除予定 — dev=submit は MINDSET 最終問まで prefill / dev=mindset は ORIGIN+GOAL のみダミー投入
+  const [answers, setAnswers] = useState<AnswerMap>(() => {
+    if (isDevSubmit) return { ...DEV_SUBMIT_PREFILL_ANSWERS };
+    if (isDevMindset) return { ...DEV_MINDSET_DUMMY_ANSWERS };
+    return {};
+  });
+  // TODO(temp): 確認完了後に削除予定 — dev=submit は mindset_freenote から / dev=mindset は MINDSET 先頭から
+  const [currentId, setCurrentId] = useState<string>(() => {
+    if (isDevSubmit) return DEV_SUBMIT_START_ID;
+    if (isDevMindset) return DEV_MINDSET_START_ID;
+    return set.firstId;
+  });
+  // TODO(temp): 確認完了後に削除予定 — dev=submit のとき history を「ORIGIN→GOAL→MINDSET 14 問」で初期化
+  //   (進捗バーの ProgressSnapshot が「ORIGIN/GOAL は完了済み・MINDSET の最後の 1 問だけ残っている」状態を
+  //    正しく表示するため。getProgress は history+currentId からセクション内位置を計算する)。
+  const [history, setHistory] = useState<string[]>(() => {
+    if (isDevSubmit) {
+      return buildHistoryUpTo(set, DEV_SUBMIT_PREFILL_ANSWERS, DEV_SUBMIT_START_ID);
+    }
+    return [];
+  });
   // レート制限関連の表示用 state(API から返ってきたデータを保持)
   // dev フラグ時はダミー値を初期投入してその場で 503 / 429 画面を表示する。
   const [monthlyInfo, setMonthlyInfo] = useState<{
