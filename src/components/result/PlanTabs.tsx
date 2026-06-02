@@ -69,8 +69,9 @@ export const PlanTabs = forwardRef<
               onClick={() => onChange(i)}
               className={[
                 "relative shrink-0 rounded-2xl border px-4 py-3 text-left transition",
-                // モバイルは「画面幅の ~85%」(右側に次タブをチラ見せ)。sm 以上は従来通り。
-                "w-[85%] sm:w-auto sm:min-w-[16rem] sm:max-w-[20rem]",
+                // モバイルは「画面幅の ~68%」(右側に次タブをしっかり見せる)。
+                // PC は flex-1 で横幅いっぱい等分(2026-06-03 かおる指示)。
+                "w-[68%] sm:w-auto sm:flex-1 sm:min-w-0 sm:shrink",
                 active
                   ? "bg-gradient-to-br from-cyan/15 to-violet/10 border-cyan/60 shadow-[0_0_24px_rgba(34,211,238,0.15)]"
                   : "bg-panel/40 border-line hover:border-cyan/40",

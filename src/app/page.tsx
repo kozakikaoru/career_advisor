@@ -33,7 +33,7 @@ export default function Home() {
 
           <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-4 py-1.5 mb-8">
-              <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_10px_#a3e635] twinkle" />
+              <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_10px_#a3e635]" />
               <span className="text-xs tracking-[0.2em] uppercase text-mute font-display">
                 Guided by the stars · AI Career Roadmap
               </span>
@@ -43,8 +43,8 @@ export default function Home() {
               <span className="text-ice">今いる場所から、</span>
               <br />
               <span className="neon-text">なりたい自分までの地図を。</span>
-              {/* H1 周辺の星屑(装飾・aria-hidden)*/}
-              <Sparkles />
+              {/* 2026-06-03 かおる方針: 後ろのアニメ廃止 */}
+              {/* <Sparkles /> */}
             </h1>
 
             <p className="text-mute mt-7 text-base sm:text-lg leading-relaxed max-w-xl">

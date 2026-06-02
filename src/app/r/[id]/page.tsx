@@ -69,6 +69,9 @@ export default async function ResultPage({
       remote_preference: "flexible",
       wlb_priority: "wlb_balance",
     });
+    // TODO(temp): 確認完了後に削除予定 — Plan 1 の title を長文に置換(タブ・ヘッダーの改行表示確認用・かおる指示 2026-06-03)
+    plan.plans[0].candidate.title =
+      "バックエンドの専門性を深めて高単価フリーランスとして独立する道";
     const baseUrl = getEnv().APP_BASE_URL.replace(/\/$/, "");
     return <ResultView plan={plan} url={`${baseUrl}/r/${id}?dev=result`} />;
   }
