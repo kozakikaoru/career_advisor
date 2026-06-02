@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
-import { StarField } from "@/components/ui/StarField";
+import { PlanetField } from "@/components/ui/PlanetField";
 
 export default function Home() {
   return (
@@ -21,12 +21,13 @@ export default function Home() {
 
       <main className="relative z-10 max-w-5xl mx-auto px-5">
         {/* Hero
-            - ambient(layout)に加えて hero variant の StarField を section 内に重ね、
-              ヒーロー周辺だけ星座ライン + 流れ星でグッと「占いっぽさ」を盛る。
-            - section に position: relative + overflow-hidden で StarField をローカルに閉じ込める。 */}
+            - 主役は右下の巨大惑星 + その周りを公転する星々(PlanetField)
+            - 背景の遠い星々(光点)は layout の ambient StarField がレイヤー 0 で敷いているのでそちらに任せる
+            - section に overflow-hidden で PlanetField の見切れをローカルに閉じ込める */}
         <section className="relative pt-20 pb-16 sm:pt-28 rise overflow-hidden">
+          {/* 惑星 + 軌道公転(右下に半分はみ出す配置は PlanetField 内で完結) */}
           <div className="absolute inset-0 -z-0 pointer-events-none">
-            <StarField variant="hero" density="normal" />
+            <PlanetField />
           </div>
 
           <div className="relative">
