@@ -228,6 +228,7 @@ function RoadmapSvg({
     : "url(#road-grad)";
 
   return (
+    <div className="relative w-full">
     <svg
       viewBox="0 0 400 160"
       className="w-full h-auto"
@@ -348,22 +349,6 @@ function RoadmapSvg({
                 filter: active && !error ? "url(#road-glow)" : "none",
               }}
             />
-            {/* ラベル */}
-            <text
-              x={n.x}
-              y={n.y + 22}
-              textAnchor="middle"
-              fontSize="9"
-              fill={active ? "#e7ecff" : "#8a93b8"}
-              opacity={active ? 1 : 0.5}
-              style={{
-                transition: "fill 0.4s ease, opacity 0.4s ease",
-                fontFamily: "var(--font-display)",
-                letterSpacing: "0.05em",
-              }}
-            >
-              {n.label}
-            </text>
           </g>
         );
       })}
@@ -373,6 +358,40 @@ function RoadmapSvg({
         <DrawHead progress={progress} />
       )}
     </svg>
+      {/*
+        2026-06-02 かおる要望 #4:
+        SVG <text> はビューボックスに比例縮小されるため、375px の端末では字が小さくなる(実測 ~7px)。
+        ラベルを HTML 側にオーバーレイ表示することで CSS font-size を素直に使えるようにし、
+        モバイルでも text-xs(12px)以上を確保。デスクトップは text-sm(14px)。
+        位置はノード(x/400, y/160)を % に変換して absolute 配置。
+        SVG ノード(円)は引き続き SVG 側にあるので、絵的な位置関係は揃う。
+       */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {nodes.map((n, i) => {
+          const active = progress >= n.from;
+          // ノード y + 22 の位置にラベルを置く設計を踏襲
+          const leftPercent = (n.x / 400) * 100;
+          const topPercent = ((n.y + 22) / 160) * 100;
+          return (
+            <span
+              key={i}
+              className="absolute -translate-x-1/2 font-display tracking-wider text-xs sm:text-sm whitespace-nowrap"
+              style={{
+                left: `${leftPercent}%`,
+                top: `${topPercent}%`,
+                color: active ? "#e7ecff" : "#8a93b8",
+                opacity: active ? 1 : 0.55,
+                transition: "color 0.4s ease, opacity 0.4s ease",
+                textShadow:
+                  "0 0 4px rgba(7,9,18,0.85), 0 1px 2px rgba(7,9,18,0.9)",
+              }}
+            >
+              {n.label}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import type { Plan } from "@/lib/schema/result";
 
 /**
@@ -8,24 +9,59 @@ import type { Plan } from "@/lib/schema/result";
  * - マッチ度バッジ + 難易度ドット
  * - クライアントコンポーネント(クリックハンドリングのため)
  * - リボン表示なし(specs §6-2 / 論点 7)
+ *
+ * 2026-06-02 追加(かおる要望 #1 / #2):
+ * - スマホでは active タブの幅をコンテナの ~85% に揃え、右側に「次タブの一部」がチラ見えするカルーセル風に。
+ * - 親から呼べる `scrollTabIntoCenter(i)` を ref 経由で公開。「他のプランを見る」ボタンでタブ自体が画面外でも、
+ *   タブ列を左右スクロールして中央付近に出すために使う。
  */
-export function PlanTabs({
-  plans,
-  activeIndex,
-  onChange,
-}: {
-  plans: readonly Plan[];
-  activeIndex: number;
-  onChange: (i: number) => void;
-}) {
+
+export type PlanTabsHandle = {
+  /** 指定 index のタブをコンテナ内で中央付近にスクロールで合わせる(スマホ用) */
+  scrollTabIntoCenter: (i: number) => void;
+};
+
+export const PlanTabs = forwardRef<
+  PlanTabsHandle,
+  {
+    plans: readonly Plan[];
+    activeIndex: number;
+    onChange: (i: number) => void;
+  }
+>(function PlanTabs({ plans, activeIndex, onChange }, ref) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollTabIntoCenter(i: number) {
+        const scroller = scrollerRef.current;
+        const target = tabRefs.current[i];
+        if (!scroller || !target) return;
+        // タブ要素の中心が scroller の中心に来る位置までスクロール
+        const targetCenter = target.offsetLeft + target.offsetWidth / 2;
+        const left = targetCenter - scroller.clientWidth / 2;
+        scroller.scrollTo({ left, behavior: "smooth" });
+      },
+    }),
+    [],
+  );
+
   return (
     <div className="mb-6" role="tablist" aria-label="進路候補 3 案">
-      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+      <div
+        ref={scrollerRef}
+        className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-1 px-1 plan-tabs-scroller"
+      >
         {plans.map((plan, i) => {
           const active = i === activeIndex;
           return (
             <button
               key={i}
+              ref={(el) => {
+                tabRefs.current[i] = el;
+              }}
               role="tab"
               aria-selected={active}
               aria-controls={`plan-panel-${i}`}
@@ -33,7 +69,8 @@ export function PlanTabs({
               onClick={() => onChange(i)}
               className={[
                 "relative shrink-0 rounded-2xl border px-4 py-3 text-left transition",
-                "min-w-[14rem] sm:min-w-[16rem] max-w-[20rem]",
+                // モバイルは「画面幅の ~85%」(右側に次タブをチラ見せ)。sm 以上は従来通り。
+                "w-[85%] sm:w-auto sm:min-w-[16rem] sm:max-w-[20rem]",
                 active
                   ? "bg-gradient-to-br from-cyan/15 to-violet/10 border-cyan/60 shadow-[0_0_24px_rgba(34,211,238,0.15)]"
                   : "bg-panel/40 border-line hover:border-cyan/40",
@@ -72,7 +109,7 @@ export function PlanTabs({
       </div>
     </div>
   );
-}
+});
 
 const FEASIBILITY_LABEL = {
   realistic: "現実的",
