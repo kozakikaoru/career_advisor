@@ -6,12 +6,17 @@ import { AdSlot } from "./AdSlot";
 
 /**
  * タブの中身(specs §3-2 〜 §3-6)。
- * 上から: CandidateHeader → Roadmap → Skills → 「他のプランを見る」CTA → AdSlot の順。
+ * 上から: CandidateHeader → Roadmap → Skills → 「次の航路を読む」CTA → AdSlot の順。
  *
  * 2026-06-02 かおる要望 #2:
  * - Skills の直下に「他のプランを見る」ボタンを設置。
  * - 押下時は親(ResultView)が次プランに循環切替し、PlanTabs の位置にスクロールバックする。
  * - 現在 index と総数を受け取って、ラベルに「次プランの番号」を出す(動的)。
+ *
+ * 2026-06-03 文言調整(かおる要望 #2 リフィン):
+ * - 「Plan N を見る →」は機能的すぎて占い世界観と乖離していたので、
+ *   「次の航路を読む(Plan N) ✦ →」に変更。サイト全体の「星々が占う」「航路」「読む」
+ *   トーンを踏襲しつつ、括弧で「次が何番か」も併記して機能性も維持。
  */
 export function PlanContent({
   plan,
@@ -47,9 +52,15 @@ export function PlanContent({
             "shadow-[0_0_18px_rgba(168,85,247,0.18)]",
             "transition",
           ].join(" ")}
-          aria-label={`Plan ${nextIndex + 1} を見る`}
+          aria-label={`次の航路(Plan ${nextIndex + 1})を読む`}
         >
-          <span>Plan {nextIndex + 1} を見る</span>
+          <span aria-hidden className="text-cyan/90">✦</span>
+          <span>
+            次の航路を読む
+            <span className="text-mute/80 ml-1.5 text-xs">
+              (Plan {nextIndex + 1})
+            </span>
+          </span>
           <span
             aria-hidden
             className="inline-block transition-transform group-hover:translate-x-0.5"
