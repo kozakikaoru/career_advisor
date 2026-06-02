@@ -24,6 +24,41 @@
       "runtimeExecutable": "/usr/local/opt/node/bin/node",
       "runtimeArgs": ["./node_modules/next/dist/bin/next", "start", "--port", "3301"],
       "port": 3301
+    },
+    {
+      "name": "career-advisor-ratelimit-3400",
+      "runtimeExecutable": "/usr/local/opt/node/bin/node",
+      "runtimeArgs": ["./node_modules/next/dist/bin/next", "start", "--port", "3400"],
+      "port": 3400,
+      "env": {
+        "RATE_LIMIT_ENABLED": "true",
+        "RATE_LIMIT_HOUR": "3",
+        "RATE_LIMIT_DAY": "5",
+        "MONTHLY_LIMIT": "1000",
+        "AI_PROVIDER": "mock",
+        "SQLITE_PATH": "./data/rl-preview.sqlite"
+      }
+    },
+    {
+      "name": "career-advisor-dev-3500",
+      "runtimeExecutable": "/usr/local/opt/node/bin/node",
+      "runtimeArgs": ["./node_modules/next/dist/bin/next", "dev", "--port", "3500"],
+      "port": 3500,
+      "env": {
+        "AI_PROVIDER": "mock",
+        "SQLITE_PATH": "./data/rl-dev-preview.sqlite"
+      }
+    },
+    {
+      "name": "career-advisor-disabled-3600",
+      "runtimeExecutable": "/usr/local/opt/node/bin/node",
+      "runtimeArgs": ["./node_modules/next/dist/bin/next", "start", "--port", "3600"],
+      "port": 3600,
+      "env": {
+        "RATE_LIMIT_ENABLED": "false",
+        "AI_PROVIDER": "mock",
+        "SQLITE_PATH": "./data/rl-disabled-preview.sqlite"
+      }
     }
   ]
 }
