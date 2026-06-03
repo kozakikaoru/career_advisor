@@ -66,6 +66,9 @@ export function ResultView({ plan, url }: { plan: CareerPlan; url: string }) {
 
   return (
     <>
+      {/* 2026-06-03 04:32 かおる方針: 背景グラデ一旦廃止
+          (画面全体 fixed 配置までしたが「とりあえず削除して」との指示) */}
+
       {/* Header */}
       <header className="relative z-10 border-b border-line/70 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">

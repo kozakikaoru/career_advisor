@@ -211,7 +211,11 @@ function RoadmapSvg({
   // path 長さ(おおよそ。SVG getTotalLength でも取れるが、固定パスなので定数で十分)
   // 実際の path で計算しなおすこともできるが、500 でほぼ収まる長さに設計してある。
   const PATH_LENGTH = 520;
-  const drawn = PATH_LENGTH * progress;
+  // 2026-06-03 かおる FB: ラインの伸びが「現状少し早い」体感だったので、
+  // progress に対する描画長を easeIn(1.25 乗)気味に補正して 25-30% ゆっくり見せる。
+  // 終端 progress=1 では PATH_LENGTH と一致するので、フィナーレ演出のタイミングはずれない。
+  // 全体 150s の進行カーブ自体(useFakeProgress)は変えない。
+  const drawn = PATH_LENGTH * Math.pow(progress, 1.25);
 
   // 5 つの目印ノード(パス上のだいたい等間隔の座標 + 名前)
   // 順に点灯することで「ロードマップを 5 段階で組み立てている」見え方になる。
@@ -421,7 +425,9 @@ function DrawHead({ progress }: { progress: number }) {
     segs.push(Math.hypot(x2 - x1, y2 - y1));
   }
   const total = segs.reduce((a, b) => a + b, 0);
-  const target = progress * total;
+  // 2026-06-03 RoadmapSvg と同じ easeIn(1.25 乗)カーブで進む先端位置を求める
+  // → 描画線と光点(先端)がズレない
+  const target = Math.pow(progress, 1.25) * total;
 
   let acc = 0;
   let x = pts[0][0];

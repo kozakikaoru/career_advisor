@@ -15,8 +15,14 @@ import { AdSlot } from "./AdSlot";
  *
  * 2026-06-03 文言調整(かおる要望 #2 リフィン):
  * - 「Plan N を見る →」は機能的すぎて占い世界観と乖離していたので、
- *   「次の航路を読む(Plan N) ✦ →」に変更。サイト全体の「星々が占う」「航路」「読む」
- *   トーンを踏襲しつつ、括弧で「次が何番か」も併記して機能性も維持。
+ *   「次の航路を読む(Plan N) ✦ →」に変更。
+ *
+ * 2026-06-03 追加 FB(カード統合):
+ * - 「プラン概要(CandidateHeader)/ ロードマップ(Roadmap)/ 必要スキル(Skills)」の 3 つを、
+ *   1 枚の大きな `glow-card` に統合する。各セクションは bare モードで描画し、
+ *   間を薄い水平線(`border-t border-line/60` + `pt-7 mt-7`)で区切るだけにする。
+ * - 「他のプランを見る」CTA と AdSlot はこの統合カードの **外** に出す(従来と同じ独立配置)。
+ * - bare prop 非対応の旧呼び出しが他に無いか念のため意識しつつ、デフォルト false で後方互換。
  */
 export function PlanContent({
   plan,
@@ -36,9 +42,23 @@ export function PlanContent({
       id={`plan-panel-${index}`}
       aria-labelledby={`plan-tab-${index}`}
     >
-      <CandidateHeader candidate={plan.candidate} />
-      <Roadmap roadmap={plan.roadmap} />
-      <Skills skills={plan.skills} />
+      {/* 統合カード: プラン概要 + ロードマップ + 必要スキル */}
+      <section className="mb-8">
+        <div className="glow-card rounded-3xl p-6 sm:p-9">
+          <CandidateHeader candidate={plan.candidate} bare />
+
+          {/* セクション区切り(薄い水平線) */}
+          <div className="mt-8 pt-8 border-t border-line/60">
+            <Roadmap roadmap={plan.roadmap} bare />
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-line/60">
+            <Skills skills={plan.skills} bare />
+          </div>
+        </div>
+      </section>
+
+      {/* 「次のプランを見る」CTA(統合カード外) */}
       <div className="mt-6 flex justify-center">
         <button
           type="button"
@@ -69,6 +89,8 @@ export function PlanContent({
           </span>
         </button>
       </div>
+
+      {/* AdSlot(統合カード外) */}
       <div className="mt-10">
         <AdSlot adSlot={plan.adSlot} />
       </div>

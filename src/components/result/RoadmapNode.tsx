@@ -1,20 +1,28 @@
 import type { RoadmapNode as RoadmapNodeType } from "@/lib/schema/result";
 
 /**
- * ロードマップの 1 ノード(v2.2 / 幻想テーマ刷新)。
+ * ロードマップの 1 ノード(2026-06-03 デザイン再構築 / B 案ホロスコープ盤連動)。
  *
- * 変更点(2026-06-02 かおる要望):
- * - ノードを「角丸四角の箱(絵文字)」から「光る星(SVG)」に置換
- * - start  → 青系の 4 芒星 (現在地・地球感)
- * - milestone → 紫系の 4 芒星 + 中央に timeLabel(短い英数表記)
- * - goal   → ピンク系の 6 芒星(大きく輝く目標星)
- * - 各ノードに小さなパーティクル(twinkle)
- * - 配色は既存維持(cyan → violet → pink)
+ * 変更点(かおる要望):
+ * - 従来の「丸ドット / 4-6 芒星 path」型から、シャープな **4 芒星(✦)** へ。
+ * - kind ごとに色を変える: start = cyan / milestone = violet / goal = pink。
  *
- * 既存仕様:
- * - timeLabel バッジは min-width で短いラベル("3M" "6M")でも崩れない(specs §5-4)
- * - NOW ノードでは nowActions をチェックリストとして表示(specs §3-6-2)
- * - 8 段まで縦並びで耐える
+ * 2026-06-03 追加 FB:
+ * - 「もう少し星っぽくして欲しい」=「キラキラエフェクト感」より「明確な星のシルエット」を優先。
+ * - 縦横 4 本を**ダイヤ型 polygon(先端尖り)** に置換 → ✦ のシャープなシルエット。
+ * - 斜めの短い光線は撤去(光線過多の "キラキラ" 圧を下げる)。
+ *   代わりに**斜め 4 方向に微小な点**を置いてキラキラ感を最小限残す。
+ * - 中央の白カプセル `timeLabel`(1M/3M/6M …)は削除。横の Badge に同じ情報があるので冗長。
+ *   → 星のシルエットがカプセルに分断されず、純粋に「星」として見える。
+ *
+ * 既存仕様の維持:
+ * - timeLabel バッジ(Badge) は min-width 4rem で短いラベルでも崩れない(specs §5-4)。
+ * - NOW ノードでは nowActions をチェックリスト表示(specs §3-6-2)。
+ * - 8 段まで縦並びで耐える。
+ *
+ * 注:
+ * - 旧 `.node-star` 系の CSS ハロー(::before/::after の十字光条)はこの SVG に内包したので
+ *   コンポーネント側ではクラス付与をやめる(class からも除外)。CSS は他で使われていない。
  */
 export function RoadmapNode({
   node,
@@ -54,178 +62,159 @@ export function RoadmapNode({
 }
 
 /**
- * ノード本体。kind に応じて星の形・色・サイズを変える。
+ * ノード本体。kind に応じて色 / サイズだけ切り替え、形状は共通の「シャープ 4 芒星」。
  *
- * SVG 星型は path 1 本で構成し、グラデーション + ドロップシャドウで発光。
- * 共通の星ハロー(放射光 + 十字光条)は CSS の .node-star::before/::after が担当。
+ * 2026-06-03 追加 FB:
+ * - milestone の中央 timeLabel(白カプセル)は削除。横の Badge に同じ情報があるので冗長。
+ * - goal は少し大きめにして光を強める(従来通り)。
  */
 function NodeIcon({ node }: { node: RoadmapNodeType }) {
   if (node.kind === "start") {
     return (
-      <div
-        className="node-star absolute left-0 top-0 w-12 h-12 flex items-center justify-center"
-        style={{ ["--g" as string]: "rgba(34,211,238,0.8)" }}
-      >
-        <Star4
-          fill="url(#node-grad-start)"
-          stroke="rgba(34, 211, 238, 0.9)"
+      <div className="absolute left-0 top-0 w-12 h-12 flex items-center justify-center">
+        <SparkleStar
+          color="#22d3ee"
           glow="rgba(34, 211, 238, 0.9)"
-          size={44}
+          size={48}
         />
-        <Defs />
       </div>
     );
   }
   if (node.kind === "goal") {
     return (
-      <div
-        className="node-star node-star--goal absolute left-0 top-0 w-12 h-12 flex items-center justify-center"
-        style={{ ["--g" as string]: "rgba(244,114,182,0.95)" }}
-      >
-        <Star6
-          fill="url(#node-grad-goal)"
-          stroke="rgba(244, 114, 182, 0.95)"
+      <div className="absolute left-0 top-0 w-12 h-12 flex items-center justify-center">
+        <SparkleStar
+          color="#f472b6"
           glow="rgba(244, 114, 182, 1)"
-          size={52}
+          size={56}
+          large
         />
-        <Defs />
       </div>
     );
   }
-  // milestone — 4 芒星 + 中央に短い timeLabel
+  // milestone
   return (
-    <div
-      className="node-star absolute left-0 top-0 w-12 h-12 flex items-center justify-center"
-      style={{ ["--g" as string]: "rgba(168,85,247,0.75)" }}
-    >
-      <Star4
-        fill="url(#node-grad-milestone)"
-        stroke="rgba(168, 85, 247, 0.85)"
-        glow="rgba(168, 85, 247, 0.85)"
-        size={44}
+    <div className="absolute left-0 top-0 w-12 h-12 flex items-center justify-center">
+      <SparkleStar
+        color="#a855f7"
+        glow="rgba(168, 85, 247, 0.9)"
+        size={48}
       />
-      <Defs />
-      {/*
-        2026-06-02 かおる要望 #3:
-        星の上に乗る "1M" / "3M" 等のラベルが白文字×紫星で読みにくかったので、
-        - 文字の背後に半透明の暗いカプセル(背景パネル色)を敷いて可読性を確保
-        - 文字に薄い黒の縁取り(text-shadow を多方向に)も併用してコントラストを底上げ
-
-        2026-06-03 さらに調整:
-        - 文字色 ice → cyan/100 寄り(薄い水色)で星色との分離をさらに強める
-        - カプセル背景の暗さを bg/65 → bg/80 に上げて視認性を底上げ
-        - フチを line/40 → cyan/40 に変えてマイルストーン感を保つ
-       */}
-      <span
-        className="absolute z-10 font-display text-[0.65rem] font-bold leading-none px-1.5 py-0.5 rounded-md bg-bg/80 border border-cyan/40 backdrop-blur-[1px]"
-        style={{
-          color: "#cffafe",
-          textShadow:
-            "0 0 2px rgba(7,9,18,1), 0 0 1px rgba(7,9,18,1), 0 1px 2px rgba(7,9,18,0.95)",
-        }}
-      >
-        {node.timeLabel}
-      </span>
     </div>
   );
 }
 
 /**
- * 共有 <defs>(グラデ定義)。
- * 各ノードに毎回出るがブラウザは同一 id を 1 度だけ参照するため重複表示にはならない。
- * SSR と CSR で同一 markup なので hydration mismatch も起きない。
+ * シャープ 4 芒星(✦)SVG。
+ *
+ * 2026-06-03 リデザイン:
+ * - 旧「縦横 4 + 斜め 4」の line ベースの "金平糖" 型は「キラキラエフェクト感」が強すぎたため、
+ *   かおる FB を受けて **4 芒星のシルエットを基本** にし、シャープな星型へ。
+ * - 縦横 4 本: `<line>` ではなく **細長いダイヤ型 `<polygon>`** にして先端を尖らせる。
+ *   → 同じ太さの線より「星」感が出る(✦ ★ のシルエットに寄る)。
+ * - 斜め 4 本の光線は撤去。代わりに微小な **点(circle)** を斜め 45° に配置して
+ *   キラキラ感を「うっすら」だけ残す(完全に消すと地味すぎる)。
+ * - 中心の白いコア + radialGradient の発光 + 外周ハローは維持。
+ *
+ * 設計:
+ * - viewBox 0..100 で構築。size px に拡縮。
+ * - `large` で goal 用に外形と中心半径を強める。
+ *
+ * uniqueId:
+ * - radialGradient を SVG 内 defs に置くため、複数ノードで id が衝突しないよう
+ *   props.color の hex から派生した短い ID を生成。
  */
-function Defs() {
+function SparkleStar({
+  color,
+  glow,
+  size,
+  large = false,
+}: {
+  color: string;
+  glow: string;
+  size: number;
+  large?: boolean;
+}) {
+  // 一意なグラデ ID(同一カラーなら同じ id で OK = 重複しても 1 度しか参照されない)
+  const gradId = `sparkle-${color.replace("#", "").toLowerCase()}${large ? "-l" : ""}`;
+  const haloId = `${gradId}-halo`;
+
+  // 4 芒星の外形(ダイヤ型 polygon)寸法。
+  // tip = 先端の中心からの距離 / waist = 中心くびれの幅(細さ)
+  // waist を小さくすると "鋭い ✦"、大きくすると "ぷっくりダイヤ"
+  const tip = large ? 48 : 44; // 先端
+  const waist = large ? 6 : 5; // くびれ
+  const centerR = large ? 9 : 7.5; // 中心発光円
+  const innerR = large ? 3.2 : 2.6; // 中心の白コア
+  const dotR = large ? 1.6 : 1.3; // 斜め微小点(キラキラ感の名残)
+  // 斜め点の中心からの距離(細長い 4 芒星の "ヘリ" よりやや外側に置く)
+  const dotDist = large ? 18 : 16;
+
+  // 縦長ダイヤ polygon の頂点座標(中心 50,50)
+  // 上 / 右くびれ / 下 / 左くびれ
+  const vertPoly = [
+    `50,${50 - tip}`,
+    `${50 + waist},50`,
+    `50,${50 + tip}`,
+    `${50 - waist},50`,
+  ].join(" ");
+  // 横長ダイヤ polygon
+  const horizPoly = [
+    `${50 - tip},50`,
+    `50,${50 - waist}`,
+    `${50 + tip},50`,
+    `50,${50 + waist}`,
+  ].join(" ");
+
+  // 斜め 4 点(右上 / 右下 / 左下 / 左上)
+  const d = dotDist * 0.707;
+  const sparkleDots: Array<[number, number]> = [
+    [50 + d, 50 - d],
+    [50 + d, 50 + d],
+    [50 - d, 50 + d],
+    [50 - d, 50 - d],
+  ];
+
   return (
-    <svg width="0" height="0" className="absolute" aria-hidden>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      aria-hidden
+      style={{ filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 0 14px ${glow})` }}
+    >
       <defs>
-        <radialGradient id="node-grad-start" cx="40%" cy="35%" r="65%">
-          <stop offset="0%" stopColor="#e7ecff" />
-          <stop offset="45%" stopColor="#22d3ee" />
-          <stop offset="100%" stopColor="#0e4a55" />
-        </radialGradient>
-        <radialGradient id="node-grad-milestone" cx="40%" cy="35%" r="65%">
-          <stop offset="0%" stopColor="#e7ecff" />
-          <stop offset="45%" stopColor="#a855f7" />
-          <stop offset="100%" stopColor="#3a1a66" />
-        </radialGradient>
-        <radialGradient id="node-grad-goal" cx="40%" cy="35%" r="70%">
+        <radialGradient id={gradId} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="35%" stopColor="#f472b6" />
-          <stop offset="75%" stopColor="#a855f7" />
-          <stop offset="100%" stopColor="#3a1a66" />
+          <stop offset="35%" stopColor={color} />
+          <stop offset="100%" stopColor={color} stopOpacity="0.15" />
+        </radialGradient>
+        <radialGradient id={haloId} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
         </radialGradient>
       </defs>
-    </svg>
-  );
-}
 
-/** 4 芒星(start / milestone 用)— path は単位円(viewBox 0 0 100 100)上で構築 */
-function Star4({
-  fill,
-  stroke,
-  glow,
-  size,
-}: {
-  fill: string;
-  stroke: string;
-  glow: string;
-  size: number;
-}) {
-  // 4 芒星: 中心から上下左右に長い針、対角線方向に短い針(8 頂点)
-  // 長針: 半径 48 / 短針: 半径 14
-  const d =
-    "M50 2 L58 36 L92 50 L58 64 L50 98 L42 64 L8 50 L42 36 Z";
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      style={{
-        filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 0 16px ${glow})`,
-      }}
-      aria-hidden
-    >
-      <path d={d} fill={fill} stroke={stroke} strokeWidth="1.2" strokeLinejoin="round" />
-    </svg>
-  );
-}
+      {/* 外周ハロー(うっすら) */}
+      <circle cx="50" cy="50" r="46" fill={`url(#${haloId})`} />
 
-/** 6 芒星(goal 用)— star of david 風の幾何的な大きい星 */
-function Star6({
-  fill,
-  stroke,
-  glow,
-  size,
-}: {
-  fill: string;
-  stroke: string;
-  glow: string;
-  size: number;
-}) {
-  // 6 芒星: 中心から 6 方向に長い針 + 6 方向の短い針(12 頂点)
-  // 上 → 右上 → 右 → ... と並ぶ
-  // 長針: 半径 48 / 短針: 半径 18
-  const points: [number, number][] = [];
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
-    const r = i % 2 === 0 ? 48 : 18;
-    points.push([50 + Math.cos(angle) * r, 50 + Math.sin(angle) * r]);
-  }
-  const d = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(2)} ${p[1].toFixed(2)}`)
-    .join(" ") + " Z";
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      style={{
-        filter: `drop-shadow(0 0 8px ${glow}) drop-shadow(0 0 22px ${glow})`,
-      }}
-      aria-hidden
-    >
-      <path d={d} fill={fill} stroke={stroke} strokeWidth="1.2" strokeLinejoin="round" />
+      {/* 4 芒星本体: 縦長 + 横長のダイヤ polygon を重ねる(✦ シルエット) */}
+      <g fill={color}>
+        <polygon points={vertPoly} />
+        <polygon points={horizPoly} />
+      </g>
+
+      {/* 斜め 4 方向の微小点(キラキラ感をうっすら残す) */}
+      <g fill={color} opacity="0.7">
+        {sparkleDots.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={dotR} />
+        ))}
+      </g>
+
+      {/* 中心の発光円(グラデで内側から光る) */}
+      <circle cx="50" cy="50" r={centerR} fill={`url(#${gradId})`} />
+      {/* 中心の白いコア(最も明るい点) */}
+      <circle cx="50" cy="50" r={innerR} fill="#ffffff" />
     </svg>
   );
 }

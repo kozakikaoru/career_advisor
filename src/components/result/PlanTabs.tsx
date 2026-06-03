@@ -68,41 +68,45 @@ export const PlanTabs = forwardRef<
               id={`plan-tab-${i}`}
               onClick={() => onChange(i)}
               className={[
-                "relative shrink-0 rounded-2xl border px-4 py-3 text-left transition",
+                "relative shrink-0 rounded-2xl border px-4 py-3.5 text-center transition",
                 // モバイルは「画面幅の ~68%」(右側に次タブをしっかり見せる)。
                 // PC は flex-1 で横幅いっぱい等分(2026-06-03 かおる指示)。
                 "w-[68%] sm:w-auto sm:flex-1 sm:min-w-0 sm:shrink",
+                // backdrop-filter で背景ホロスコープ盤がうっすらにじむ(モック B-wheel/result.html `.tab` 参照)
+                "backdrop-blur-md",
                 active
                   ? "bg-gradient-to-br from-cyan/15 to-violet/10 border-cyan/60 shadow-[0_0_24px_rgba(34,211,238,0.15)]"
-                  : "bg-panel/40 border-line hover:border-cyan/40",
+                  : "bg-panel/55 border-line hover:border-cyan/40",
               ].join(" ")}
             >
-              <div className="flex items-center justify-between gap-2 mb-1.5">
+              {/* 2026-06-03 かおる FB: 右上の % 表示は削除。
+                  下のマッチ度カード(CandidateHeader)に同じ情報があるので冗長。
+                  タブはプラン名 / 実現可能性ドット だけで構成し、視覚的にスッキリ。 */}
+
+              {/* センタリング: items-center justify-center で縦横とも中央 */}
+              <div className="flex flex-col items-center justify-center gap-1.5">
+                {/* PLAN ラベル(小・cyan) */}
                 <span
                   className={[
-                    "text-[0.65rem] font-display tracking-wider uppercase",
+                    "text-[0.65rem] font-display tracking-[0.2em] uppercase",
                     active ? "text-cyan" : "text-mute",
                   ].join(" ")}
                 >
                   Plan {i + 1}
                 </span>
-                <span
-                  className={[
-                    "text-xs font-display font-bold",
-                    active ? "text-cyan" : "text-mute",
-                  ].join(" ")}
-                >
-                  {plan.candidate.matchPercent}%
-                </span>
-              </div>
-              <p className="text-sm font-semibold leading-snug line-clamp-2">
-                {plan.candidate.title}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <FeasibilityDot feasibility={plan.candidate.feasibility} />
-                <span className="text-[0.65rem] text-mute">
-                  {FEASIBILITY_LABEL[plan.candidate.feasibility]}
-                </span>
+
+                {/* プラン名(タイトル大) */}
+                <p className="text-sm sm:text-[0.95rem] font-semibold leading-snug line-clamp-2 max-w-full">
+                  {plan.candidate.title}
+                </p>
+
+                {/* 実現可能性ドット + ラベル */}
+                <div className="mt-0.5 flex items-center justify-center gap-2">
+                  <FeasibilityDot feasibility={plan.candidate.feasibility} />
+                  <span className="text-[0.65rem] text-mute">
+                    {FEASIBILITY_LABEL[plan.candidate.feasibility]}
+                  </span>
+                </div>
               </div>
             </button>
           );
