@@ -39,9 +39,14 @@ body {
   color: transparent;
 }
 
-/* glowing border card */
+/* glowing border card
+   2026-06-03 B 案ホロスコープ盤を背面に置く前提で `backdrop-filter: blur(14px)` を追加。
+   盤の発光ドット・同心円が直接透けると読みにくいので、カード自体が淡くガラス化する。
+   モック B-wheel/result.html `.plan` クラス参照。 */
 .glow-card {
-  background: linear-gradient(180deg, rgba(20, 26, 48, 0.9), rgba(14, 18, 34, 0.9));
+  background: linear-gradient(180deg, rgba(20, 26, 48, 0.88), rgba(14, 18, 34, 0.92));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(34, 42, 69, 0.9);
   box-shadow:
     0 20px 60px -30px rgba(0, 0, 0, 0.9),
@@ -170,190 +175,54 @@ body {
   }
 }
 
-/* かつての .grid-bg(中央放射グラデ + 縦横グリッド)は幻想テーマと不整合のため撤去。
-   背景は共通の StarField(光点 + ネビュラ) + 各ヒーローの静止 HeroBackdrop に一任。
-   2026-06-03: 旧 PlanetField(右下公転惑星)/ WarpField(80 個流れる星)はかおる FB で廃止。 */
-
-/* =========================================================================
-   星々が占う・幻想テーマ
-   - サイト全体の共通星空レイヤー(StarField)
-   - hero / ambient の 2 バリアント
-   - 既存の neon-text / glow-card / grid-bg を残しつつ重ねる前提
-   ========================================================================= */
-
-/* StarField: 共通の固定背景レイヤー(layout.tsx で 1 回だけ呼ぶ) */
-.star-field {
+/* 2026-06-03 サイト全体の背景: B 案ホロスコープ盤(HoroscopeWheel.tsx)。
+   layout.tsx の <body> 直下に <HoroscopeWheel /> を 1 回だけレンダリングする想定。
+   画面中央(ヘッダー分だけ下にずらした位置)に固定された巨大 SVG 盤を回転させる。
+   2026-06-03 10:07 かおる FB:
+   - 中心を「ヘッダーの分(h-16 = 64px)」だけ下にずらす → コンテンツ領域の見た目中心と一致
+   - スマホで小さく感じる + PC でも少し大きめ試したい → 120vmin/1100px → 140vmin/1280px
+   - 回転をもう少し早く → 600s → 300s(0.6°/s → 1.2°/s)
+   2026-06-03 追加 FB:
+   - 回転を更に早く → 300s → 250s(1.2°/s → 1.44°/s, +20%)
+   - スマホ(<=768px)では vmin が縦長端末で小さくなる(375x812 → 1vmin=3.75px)ため
+     140vmin だと 525px しか出ず、画面に対して相対的に小さい。180vmin/1280px に拡大して
+     画面横幅の 1.8 倍規模の盤にし、しっかり覆う印象に。
+   reduced-motion 環境では回転を完全停止(静止)。 */
+.horoscope-wheel {
   position: fixed;
-  inset: 0;
-  pointer-events: none;
-  /* z-0(画面背景) より奥に置く。body の bg より手前で grid-bg と重なる。 */
-  z-index: 0;
-  overflow: hidden;
-  /* 全面で受けるが、はみ出さない */
-  contain: strict;
-}
-
-.star-field__nebula {
-  position: absolute;
-  inset: -10%;
-  background-image:
-    radial-gradient(45% 35% at 20% 18%, rgba(34, 211, 238, 0.085), transparent 70%),
-    radial-gradient(50% 38% at 75% 70%, rgba(244, 114, 182, 0.07), transparent 72%),
-    radial-gradient(60% 45% at 50% 50%, rgba(168, 85, 247, 0.06), transparent 75%);
-  animation: nebula-drift 24s ease-in-out infinite;
-  will-change: transform;
-}
-
-.star-field__stars {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.star-field__constellation {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.6;
-}
-
-/* hero バリアントだけ少し主張(透明度・密度感を上げる) */
-.star-field--hero .star-field__nebula {
-  background-image:
-    radial-gradient(45% 35% at 20% 18%, rgba(34, 211, 238, 0.12), transparent 70%),
-    radial-gradient(50% 38% at 75% 70%, rgba(244, 114, 182, 0.1), transparent 72%),
-    radial-gradient(60% 45% at 50% 50%, rgba(168, 85, 247, 0.09), transparent 75%);
-}
-
-/* 流れ星(hero 内・カードの背景レイヤーで使用) */
-.star-field__shoot {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  border-radius: 99px;
-  background: linear-gradient(90deg, rgba(231, 236, 255, 0), rgba(231, 236, 255, 0.95));
-  box-shadow: 0 0 8px rgba(231, 236, 255, 0.8);
-  opacity: 0;
-  transform: rotate(20deg);
-  animation: shoot 8s ease-in-out infinite;
-}
-.star-field__shoot::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 80px;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(231, 236, 255, 0), rgba(231, 236, 255, 0.6));
-  transform: translateX(-78px);
-}
-
-@keyframes star-twinkle {
-  0%, 100% {
-    opacity: var(--tw-min, 0.35);
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.4);
-  }
-}
-@keyframes nebula-drift {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(2%, -1.5%) scale(1.05);
-  }
-}
-@keyframes shoot {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) rotate(20deg);
-  }
-  6% {
-    opacity: 1;
-  }
-  14% {
-    opacity: 0;
-    transform: translate(220px, 80px) rotate(20deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(220px, 80px) rotate(20deg);
-  }
-}
-
-/* =========================================================================
-   HeroBackdrop — トップ/結果ヒーロー用の「静止」幻想背景レイヤー
-   2026-06-03 PlanetField / WarpField の動きを廃止 → これに置換。
-   - 動かない radial-gradient のオーラ + 動かない装飾光点だけで構成
-   - prefers-reduced-motion でも常に同じ見た目(分岐不要)
-   ========================================================================= */
-.hero-backdrop {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.hero-backdrop__aura {
-  position: absolute;
-  inset: -10%;
-  /* background は variant ごとに inline で指定 */
-  filter: blur(0.5px);
-}
-
-/* 装飾光点(共通) — 動かない丸い発光ドット */
-.hero-backdrop__sigil {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-/* top: 右下に「遠い 1 等星」だけ静かに置く(惑星の代替・控えめ) */
-.hero-backdrop__sigil--planet {
-  right: 8%;
-  bottom: 18%;
-  width: 10px;
-  height: 10px;
-  background: radial-gradient(
-    circle at 35% 35%,
-    rgba(255, 255, 255, 0.95),
-    rgba(244, 114, 182, 0.8) 50%,
-    rgba(168, 85, 247, 0) 100%
-  );
-  box-shadow:
-    0 0 24px rgba(244, 114, 182, 0.45),
-    0 0 60px rgba(168, 85, 247, 0.3);
-}
-
-/* top: 右上の小さな十字光点(占いの星座感) */
-.hero-backdrop__sigil--cross {
-  top: 18%;
-  right: 22%;
-  width: 4px;
-  height: 4px;
-  background: rgba(34, 211, 238, 0.9);
-  box-shadow:
-    0 0 10px rgba(34, 211, 238, 0.8),
-    0 0 24px rgba(34, 211, 238, 0.4);
-}
-
-/* result: 中央の消失点ドット(動かない・WarpField の core 代替) */
-.hero-backdrop__sigil--core {
   left: 50%;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  background: rgba(231, 236, 255, 0.85);
-  box-shadow:
-    0 0 14px rgba(231, 236, 255, 0.55),
-    0 0 40px rgba(168, 85, 247, 0.35),
-    0 0 90px rgba(34, 211, 238, 0.2);
+  top: calc(50% + 32px); /* ヘッダー h-16(64px)の半分だけ下にオフセット */
+  width: min(140vmin, 1280px);
+  height: min(140vmin, 1280px);
+  /* 中央寄せ + 回転を keyframe 側で両立(translate を keyframe 内に含める) */
   transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: wheel-spin 250s linear infinite;
+}
+@media (max-width: 768px) {
+  .horoscope-wheel {
+    width: min(180vmin, 1280px);
+    height: min(180vmin, 1280px);
+  }
+}
+.horoscope-wheel > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+@keyframes wheel-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .horoscope-wheel {
+    animation: none;
+  }
 }
 
 /* スターオーラ — ボタンなどの周辺をうっすら脈動光させる
@@ -388,14 +257,12 @@ body {
   }
 }
 
-/* twinkle: 任意の要素を瞬かせる(h1 の傍に小さな星屑を散らす用途) */
-.twinkle {
-  animation: star-twinkle 3.2s ease-in-out infinite;
-}
-
-/* feature-card: ホバーで光が増す。通常時もごく弱く脈動。 */
+/* feature-card: ホバーで光が増す。通常時もごく弱く脈動。
+   2026-06-03 ホロスコープ盤を背面に置いた関係で blur 追加(モック B-wheel/top.html .feature 参照)。 */
 .feature-card {
   position: relative;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow:
     0 20px 60px -30px rgba(0, 0, 0, 0.9),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -430,11 +297,7 @@ body {
 
 /* prefers-reduced-motion を尊重 */
 @media (prefers-reduced-motion: reduce) {
-  .star-field__stars circle,
-  .star-field__nebula,
-  .star-field__shoot,
-  .star-aura::after,
-  .twinkle {
+  .star-aura::after {
     animation: none !important;
   }
 }

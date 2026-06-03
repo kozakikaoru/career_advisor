@@ -1,22 +1,15 @@
 import type { Hero } from "@/lib/schema/result";
-import { HeroBackdrop } from "@/components/ui/HeroBackdrop";
 
 /**
  * ヒーロー(全案共通)。
- * v2: tagline(AI 生成キャッチコピー)を大見出しで表示し、
+ * v2: tagline(AI 生成キャッチコピー)を大見出しで表示。
  *     「○○から××へ」の動的表示は廃止(specs §3-1 / §6-3)。
- * v2.2: 「奥→手前に流れる」遠近表現の WarpField を背景に敷いていた。
- * 2026-06-03: WarpField(80 個流れる星)はかおる FB で廃止 → 静止の HeroBackdrop に置換。
- *             「占い・夜空」のトーンは静止画ベースのオーラと中央消失点で踏襲。
+ * 2026-06-03: 旧 WarpField / HeroBackdrop / ResultSparkles はすべて廃止。
+ *     ベース bg + tagline の neon-text のみで素朴に見せる。
  */
 export function ResultHero({ hero }: { hero: Hero }) {
   return (
-    <section className="relative pt-14 pb-14 rise overflow-hidden">
-      {/* 静止背景(動かない幻想オーラ + 中央の消失点ドット) */}
-      <div className="absolute inset-0 -z-0 pointer-events-none">
-        <HeroBackdrop variant="result" />
-      </div>
-
+    <section className="relative pt-14 pb-14 rise">
       <div className="relative">
         <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-4 py-1.5 mb-7">
           <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_10px_#a3e635]" />
@@ -26,8 +19,6 @@ export function ResultHero({ hero }: { hero: Hero }) {
         </div>
         <h1 className="relative font-display text-4xl sm:text-6xl font-bold leading-[1.1] tracking-tight">
           <span className="neon-text break-words">{hero.tagline}</span>
-          {/* 2026-06-03 かおる方針: 後ろのアニメ廃止 */}
-          {/* <ResultSparkles /> */}
         </h1>
         <p className="text-mute mt-6 text-base leading-relaxed max-w-2xl">
           {hero.summary}
@@ -46,49 +37,5 @@ export function ResultHero({ hero }: { hero: Hero }) {
         </div>
       </div>
     </section>
-  );
-}
-
-/** tagline 周辺に散らす星屑。位置は固定。 */
-function ResultSparkles() {
-  const spots = [
-    { top: "-12%", left: "88%", size: 5, delay: "0.4s", hue: "cyan" },
-    { top: "30%", left: "100%", size: 4, delay: "2.1s", hue: "pink" },
-    { top: "78%", left: "12%", size: 3, delay: "1.5s", hue: "ice" },
-    { top: "-8%", left: "32%", size: 3, delay: "3.4s", hue: "violet" },
-  ];
-  return (
-    <span aria-hidden="true" className="pointer-events-none">
-      {spots.map((s, i) => (
-        <span
-          key={i}
-          className="twinkle absolute rounded-full"
-          style={{
-            top: s.top,
-            left: s.left,
-            width: s.size,
-            height: s.size,
-            background:
-              s.hue === "cyan"
-                ? "#22d3ee"
-                : s.hue === "pink"
-                  ? "#f472b6"
-                  : s.hue === "violet"
-                    ? "#a855f7"
-                    : "#e7ecff",
-            boxShadow: `0 0 ${s.size * 2}px ${
-              s.hue === "cyan"
-                ? "#22d3ee"
-                : s.hue === "pink"
-                  ? "#f472b6"
-                  : s.hue === "violet"
-                    ? "#a855f7"
-                    : "rgba(231, 236, 255, 0.85)"
-            }`,
-            animationDelay: s.delay,
-          }}
-        />
-      ))}
-    </span>
   );
 }

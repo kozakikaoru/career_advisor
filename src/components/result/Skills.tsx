@@ -15,10 +15,21 @@ const TAG_COLORS = [
  * - recommendedCerts(0〜3 件)
  * - strengths(2〜5 件)
  * specs §3-5 / §6-6
+ *
+ * 2026-06-03 かおる FB:
+ * - PlanContent 側で「プラン概要 + ロードマップ + 必要スキル」を 1 つの統合カードに
+ *   まとめるため、`bare` mode を追加。true のとき外側の `<div class="glow-card">`
+ *   ラッパを外し、内側コンテンツだけ返す。
  */
-export function Skills({ skills }: { skills: PlanSkills }) {
-  return (
-    <div className="glow-card rounded-2xl p-6 sm:p-7">
+export function Skills({
+  skills,
+  bare = false,
+}: {
+  skills: PlanSkills;
+  bare?: boolean;
+}) {
+  const inner = (
+    <>
       <div className="flex items-center gap-2.5 mb-6">
         <span className="text-lg">📡</span>
         <h2 className="font-display text-lg font-semibold tracking-tight">
@@ -110,6 +121,12 @@ export function Skills({ skills }: { skills: PlanSkills }) {
           ))}
         </div>
       </section>
-    </div>
+    </>
   );
+
+  if (bare) {
+    return <div>{inner}</div>;
+  }
+
+  return <div className="glow-card rounded-2xl p-6 sm:p-7">{inner}</div>;
 }

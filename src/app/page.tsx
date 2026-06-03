@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
-import { HeroBackdrop } from "@/components/ui/HeroBackdrop";
 
 export default function Home() {
   return (
@@ -21,16 +20,9 @@ export default function Home() {
 
       <main className="relative z-10 max-w-5xl mx-auto px-5">
         {/* Hero
-            - 2026-06-03: 旧 PlanetField(公転惑星)はかおる FB で廃止 → 静止の HeroBackdrop に置換
-            - 動かないネビュラ + 控えめな固定光点だけで「占い・夜空」のトーンを保つ
-            - 背景の遠い星々(光点)は layout の ambient StarField がレイヤー 0 で敷いているのでそちらに任せる
-            - section に overflow-hidden で背景の見切れをローカルに閉じ込める */}
-        <section className="relative pt-20 pb-16 sm:pt-28 rise overflow-hidden">
-          {/* 静止背景(動かない幻想オーラ + 装飾光点) */}
-          <div className="absolute inset-0 -z-0 pointer-events-none">
-            <HeroBackdrop variant="top" />
-          </div>
-
+            - 2026-06-03 04:36 かおる方針: 背景グラデ(HeroBackdrop)も廃止
+            - ベースの bg(濃紺)だけで素朴に表示する */}
+        <section className="relative pt-20 pb-16 sm:pt-28 rise">
           <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-4 py-1.5 mb-8">
               <span className="w-2 h-2 rounded-full bg-lime shadow-[0_0_10px_#a3e635]" />
@@ -43,8 +35,6 @@ export default function Home() {
               <span className="text-ice">今いる場所から、</span>
               <br />
               <span className="neon-text">なりたい自分までの地図を。</span>
-              {/* 2026-06-03 かおる方針: 後ろのアニメ廃止 */}
-              {/* <Sparkles /> */}
             </h1>
 
             <p className="text-mute mt-7 text-base sm:text-lg leading-relaxed max-w-xl">
@@ -110,52 +100,6 @@ export default function Home() {
         </p>
       </footer>
     </>
-  );
-}
-
-/** H1 周辺の星屑(装飾)。位置は意図的に固定。 */
-function Sparkles() {
-  // 各 span に独立した遅延を持たせて「ふっと光る」を演出
-  const spots = [
-    { top: "-10%", left: "92%", size: 6, delay: "0s", hue: "cyan" },
-    { top: "12%", left: "98%", size: 4, delay: "1.4s", hue: "pink" },
-    { top: "55%", left: "88%", size: 5, delay: "2.6s", hue: "violet" },
-    { top: "85%", left: "75%", size: 3, delay: "0.9s", hue: "ice" },
-    { top: "-15%", left: "60%", size: 4, delay: "3.2s", hue: "ice" },
-  ];
-  return (
-    <span aria-hidden="true" className="pointer-events-none">
-      {spots.map((s, i) => (
-        <span
-          key={i}
-          className="twinkle absolute rounded-full"
-          style={{
-            top: s.top,
-            left: s.left,
-            width: s.size,
-            height: s.size,
-            background:
-              s.hue === "cyan"
-                ? "#22d3ee"
-                : s.hue === "pink"
-                  ? "#f472b6"
-                  : s.hue === "violet"
-                    ? "#a855f7"
-                    : "#e7ecff",
-            boxShadow: `0 0 ${s.size * 2}px ${
-              s.hue === "cyan"
-                ? "#22d3ee"
-                : s.hue === "pink"
-                  ? "#f472b6"
-                  : s.hue === "violet"
-                    ? "#a855f7"
-                    : "rgba(231, 236, 255, 0.85)"
-            }`,
-            animationDelay: s.delay,
-          }}
-        />
-      ))}
-    </span>
   );
 }
 

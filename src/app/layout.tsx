@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
-import { StarField } from "@/components/ui/StarField";
+import { HoroscopeWheel } from "@/components/ui/HoroscopeWheel";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -31,8 +31,9 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${spaceGrotesk.variable} ${notoSansJp.variable}`}>
       <body className="font-sans text-ice bg-bg min-h-screen overflow-x-hidden">
-        {/* 2026-06-03 かおる方針: 後ろのアニメ一旦廃止(StarField/Sparkles 含む全部) */}
-        {/* <StarField variant="ambient" density="normal" /> */}
+        {/* 2026-06-03 サイト全体の背景: ホロスコープ盤 + 微小星(B 案)。
+            全ページ共通で 1 回だけレンダリング。z-10 のコンテンツの背後 (-z-10) に固定配置。 */}
+        <HoroscopeWheel />
         {children}
       </body>
     </html>
