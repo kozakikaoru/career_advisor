@@ -204,7 +204,7 @@ describe("HeroSchema v2", () => {
 });
 
 describe("PlanCandidateSchema v2", () => {
-  it("detail は 80 字以上 500 字以下(2026-06-02 緩和)", () => {
+  it("detail は 80 字以上 350 字以下(2026-06-05 SchemaFail 対策で 500 → 350 に縮小)", () => {
     expect(
       PlanCandidateSchema.safeParse({
         ...validCandidate,
@@ -214,9 +214,15 @@ describe("PlanCandidateSchema v2", () => {
     expect(
       PlanCandidateSchema.safeParse({
         ...validCandidate,
-        detail: "あ".repeat(501),
+        detail: "あ".repeat(351),
       }).success,
     ).toBe(false);
+    expect(
+      PlanCandidateSchema.safeParse({
+        ...validCandidate,
+        detail: "あ".repeat(350),
+      }).success,
+    ).toBe(true);
   });
 
   it("feasibility は 4 段階のいずれか", () => {
@@ -248,7 +254,7 @@ describe("PlanCandidateSchema v2", () => {
 });
 
 describe("RoadmapNodeSchema v2", () => {
-  it("description は 40 字以上 500 字以下(2026-06-02 緩和)", () => {
+  it("description は 40 字以上 350 字以下(2026-06-05 SchemaFail 対策で 500 → 350 に縮小)", () => {
     expect(
       RoadmapNodeSchema.safeParse({
         ...validMidNode,
@@ -258,9 +264,15 @@ describe("RoadmapNodeSchema v2", () => {
     expect(
       RoadmapNodeSchema.safeParse({
         ...validMidNode,
-        description: "あ".repeat(501),
+        description: "あ".repeat(351),
       }).success,
     ).toBe(false);
+    expect(
+      RoadmapNodeSchema.safeParse({
+        ...validMidNode,
+        description: "あ".repeat(350),
+      }).success,
+    ).toBe(true);
   });
 
   it("nowActions は 1〜3 件(任意)", () => {

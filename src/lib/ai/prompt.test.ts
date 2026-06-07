@@ -203,8 +203,30 @@ describe("buildPrompt — GOAL v2.1 学生フロー整形ガイド", () => {
     expect(p).toContain("分野クロス志向");
   });
 
-  it("(i-3) 進学者でなくても (i-3) のガイド自体は常に prompt に含まれる(静的ガイド)", () => {
+  it("(i-3) 進学者でないユーザー(student_goal_track≠advance かつ student_advance_status 未設定)には (i-3) ガイドを送らない(2026-06-05 動的化・プロンプト圧縮)", () => {
     const p = buildPrompt({ age: 28, stage: "employed" });
+    expect(p).not.toContain("# 解釈の前提: 進学者の「進学先」と「卒業後の業界」の関係性");
+    // 進学先・学部主軸の業界推論ガイドの本文も含まれないこと
+    expect(p).not.toContain("進学先・学部主軸");
+    expect(p).not.toContain("医療・看護・介護を最優先");
+  });
+
+  it("(i-3) student_goal_track=advance のユーザーには (i-3) ガイドが動的に注入される", () => {
+    const p = buildPrompt({
+      age: 18,
+      stage: "student",
+      student_goal_track: "advance",
+    });
+    expect(p).toContain("# 解釈の前提: 進学者の「進学先」と「卒業後の業界」の関係性");
+    expect(p).toContain("進学先・学部主軸");
+  });
+
+  it("(i-3) student_advance_status のみ定義されているユーザーにも (i-3) ガイドが注入される", () => {
+    const p = buildPrompt({
+      age: 18,
+      stage: "student",
+      student_advance_status: "searching",
+    });
     expect(p).toContain("# 解釈の前提: 進学者の「進学先」と「卒業後の業界」の関係性");
   });
 
