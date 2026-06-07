@@ -55,8 +55,10 @@ export const RoadmapNodeSchema = z.object({
   /**
    * 具体性を担保するため min を 40 字に引き上げ(specs §2-4 / §4-1)。
    * 2026-06-02: max を 220 → 500 に緩和(AI が制限を守れず失敗するため)。
+   * 2026-06-05: max 500 → 350 に縮小(Gemini Pro が出力途中で切れて SchemaFail
+   *   連発するため、出力量を絞ってトークン上限を引き下げる目的・@engineer)。
    */
-  description: z.string().min(40).max(500),
+  description: z.string().min(40).max(350),
   /** ノードの種類。配色(start=cyan, milestone=violet, goal=pink)に使う */
   kind: z.enum(["start", "milestone", "goal"]),
   /**
@@ -72,8 +74,8 @@ export const PlanCandidateSchema = z.object({
   title: z.string().min(1).max(80),
   /** 一覧での短文(2026-06-02: 60 → 200 に緩和) */
   shortSummary: z.string().min(1).max(200),
-  /** 詳細説明(2026-06-02: 220 → 500 に緩和) */
-  detail: z.string().min(80).max(500),
+  /** 詳細説明(2026-06-02: 220 → 500 に緩和 / 2026-06-05: 500 → 350 に縮小・SchemaFail 対策) */
+  detail: z.string().min(80).max(350),
   /** マッチ度 0-100。バーの幅と数値表示に使う */
   matchPercent: z.number().int().min(0).max(100),
   /** 4 段階の実現可能性(specs §3-4) */
@@ -88,8 +90,8 @@ export const PlanCandidateSchema = z.object({
 export const MustLearnItemSchema = z.object({
   /** 学んでおくべき分野のタイトル(2026-06-02: 40 → 80 に緩和) */
   title: z.string().min(1).max(80),
-  /** なぜそれを学ぶか・どう学ぶかを 80 字前後で(2026-06-02: 120 → 300 に緩和) */
-  description: z.string().min(1).max(300),
+  /** なぜそれを学ぶか・どう学ぶかを 80 字前後で(2026-06-02: 120 → 300 に緩和 / 2026-06-05: 300 → 200 に縮小・SchemaFail 対策) */
+  description: z.string().min(1).max(200),
 });
 
 /** スキルセクション(各案ごと・specs §3-5) */
