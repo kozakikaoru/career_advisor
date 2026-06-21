@@ -286,11 +286,16 @@ export function Wizard() {
   const isDevLoading = devMode === "loading";
   const isDevSuccess = devMode === "success";
   const isDevLoadErr = devMode === "load_err";
+  // TODO(temp): README スクショ撮影用 — 確認完了後に削除予定(?dev=loading_mid ショートカット)
+  // `?dev=loading_mid` → loading 状態の進行を 50% で固定して表示
+  // (Headless Chrome で撮影するためリアルタイム進行ではなく即時 50% を見せる)
+  // 50% 時点は STEPS[4] (fromFraction: 0.48 "3 つの航路を描き始めました…" = 5 段ノードの「実践」点灯範囲)
+  const isDevLoadingMid = devMode === "loading_mid";
 
   const [phase, setPhase] = useState<Phase>(() => {
     if (isDevMonthly) return "monthly_limit";
     if (isDevRate) return "rate_limit";
-    if (isDevLoading || isDevLoadErr) return "generating";
+    if (isDevLoading || isDevLoadErr || isDevLoadingMid) return "generating";
     if (isDevSuccess) return "finalizing";
     // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs / goal_workstyle は ConsentGate を自動通過(毎回チェックを入れる手間を省くため)
     if (isDevAnySubmit || isDevGoalWorkstyle) return "asking";
@@ -374,7 +379,8 @@ export function Wizard() {
   // - dev=loading / dev=success / dev=load_err はガード無効(画面確認のため何度も URL を切り替える)
   // - dev=submit / dev=mindset は実際の診断フローと近いのでガード有効(開発時に邪魔なら確認ダイアログで「離脱」を選べばよい)
   // - phase 遷移で結果画面 router.push() の直前に「ガードを外す」必要は無い(結果画面に遷移すると Wizard 自体が unmount され useEffect の cleanup でガードが外れるため)
-  const isDevGenView = isDevLoading || isDevSuccess || isDevLoadErr;
+  const isDevGenView =
+    isDevLoading || isDevSuccess || isDevLoadErr || isDevLoadingMid;
   const shouldGuardLeave =
     !isDevGenView &&
     (phase === "asking" || phase === "generating" || phase === "finalizing");
@@ -713,6 +719,8 @@ export function Wizard() {
                   ? "error"
                   : "loading"
             }
+            // TODO(temp): README スクショ撮影用 — 確認完了後に削除予定(?dev=loading_mid ショートカット)
+            progressOverride={isDevLoadingMid ? 0.5 : undefined}
           />
         )}
 
