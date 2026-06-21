@@ -203,6 +203,38 @@ const DEV_SUBMIT_HS_PREFILL_ANSWERS: AnswerMap = {
 // TODO(temp): 確認完了後に削除予定 — ?dev=submit_hs 用の開始質問 ID(MINDSET の最終問)
 const DEV_SUBMIT_HS_START_ID = "mindset_freenote";
 
+// TODO(temp): README スクショ撮影用 — 確認完了後に削除予定(?dev=goal_workstyle ショートカット)
+// 既存 `?dev=submit_hs`(普通科高2・将来未定ペルソナ・MINDSET 最終問から開始)から
+// ORIGIN 部分のみコピーし、GOAL は `student_goal_track: "undecided"` まで投入することで、
+// goal_workstyle 質問画面で「未回答状態」のスクリーンショットが撮れるようにする。
+// goal_workstyle 自体は意図的に prefill しない(撮影対象の質問のため)。
+// MINDSET 系も全て省略(到達しないため不要)。
+const DEV_GOAL_WORKSTYLE_PREFILL_ANSWERS: AnswerMap = {
+  // ===== ORIGIN(student → high_school → hs2 ルート / submit_hs と同一)=====
+  age: 17,
+  stage: "student",
+  school_type: "high_school",
+  grade_hs: "hs2",
+  student_major: "普通科(文理未選択)",
+  student_work_exp: ["none"],
+  knowledge_fields: ["none_kn"],
+  current_income: "none",
+  life_constraint: ["none"],
+  location: "regional_city",
+  time_available: "1to3h",
+  origin_freenote:
+    "文系か理系かもまだ決められていなくて、進路の話題はちょっと苦手です。",
+
+  // ===== GOAL(系統 B / 学生 → student_goal_track=undecided)=====
+  // student_goal_track=undecided は branch で goal_workstyle に直行するため、これだけで OK。
+  // goal_workstyle は撮影対象なので意図的に未回答のまま残す。
+  student_goal_track: "undecided",
+};
+
+// TODO(temp): README スクショ撮影用 — 確認完了後に削除予定(?dev=goal_workstyle ショートカット)
+// 開始質問 ID = goal_workstyle(この画面で未回答状態のスクショを撮る想定)
+const DEV_GOAL_WORKSTYLE_START_ID = "goal_workstyle";
+
 // TODO(temp): 確認完了後に削除予定 — ?dev=submit 用の history(訪問済み履歴)を構築。
 // firstId から answers を辿り、開始位置の手前までの ID 列を返す(順序付き)。
 // 開始位置 ID 自体は含めない(currentId は別途 state で保持される)。
@@ -236,7 +268,11 @@ export function Wizard() {
   const isDevSubmitHs = devMode === "submit_hs";
   const isDevSubmit = !isDevSubmitHs && devMode === "submit";
   const isDevAnySubmit = isDevSubmitHs || isDevSubmit;
-  const isDevMindset = !isDevAnySubmit && devMode === "mindset";
+  // TODO(temp): README スクショ撮影用 — 確認完了後に削除予定(?dev=goal_workstyle ショートカット)
+  // 優先順位: submit_hs > submit > goal_workstyle > mindset
+  const isDevGoalWorkstyle = !isDevAnySubmit && devMode === "goal_workstyle";
+  const isDevMindset =
+    !isDevAnySubmit && !isDevGoalWorkstyle && devMode === "mindset";
   // レート制限の 503 / 429 画面を単独確認するための dev フラグ。
   // `?dev=ratelimit_monthly` → 月次上限画面 / `?dev=ratelimit_429` → 短期窓レート画面
   // (本番にバレてもダミーデータが表示されるだけで悪用余地なし)
@@ -256,38 +292,47 @@ export function Wizard() {
     if (isDevRate) return "rate_limit";
     if (isDevLoading || isDevLoadErr) return "generating";
     if (isDevSuccess) return "finalizing";
-    // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs は ConsentGate を自動通過(毎回チェックを入れる手間を省くため)
-    if (isDevAnySubmit) return "asking";
+    // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs / goal_workstyle は ConsentGate を自動通過(毎回チェックを入れる手間を省くため)
+    if (isDevAnySubmit || isDevGoalWorkstyle) return "asking";
     return "consent";
   });
-  // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs は consent=true として開始(submit() の二重ガードを通すため)
-  const [consent, setConsent] = useState(isDevAnySubmit);
+  // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs / goal_workstyle は consent=true として開始(submit() の二重ガードを通すため)
+  const [consent, setConsent] = useState(isDevAnySubmit || isDevGoalWorkstyle);
   // TODO(temp): 確認完了後に削除予定 — dev=submit_hs は高校生ペルソナを prefill /
-  //   dev=submit は 30 歳ペルソナを prefill / dev=mindset は ORIGIN+GOAL のみダミー投入
+  //   dev=submit は 30 歳ペルソナを prefill / dev=goal_workstyle は ORIGIN+GOAL(undecided)のみ /
+  //   dev=mindset は ORIGIN+GOAL のみダミー投入
   const [answers, setAnswers] = useState<AnswerMap>(() => {
     if (isDevSubmitHs) return { ...DEV_SUBMIT_HS_PREFILL_ANSWERS };
     if (isDevSubmit) return { ...DEV_SUBMIT_PREFILL_ANSWERS };
+    if (isDevGoalWorkstyle) return { ...DEV_GOAL_WORKSTYLE_PREFILL_ANSWERS };
     if (isDevMindset) return { ...DEV_MINDSET_DUMMY_ANSWERS };
     return {};
   });
   // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs は mindset_freenote から /
-  //   dev=mindset は MINDSET 先頭から
+  //   dev=goal_workstyle は goal_workstyle から / dev=mindset は MINDSET 先頭から
   const [currentId, setCurrentId] = useState<string>(() => {
     if (isDevSubmitHs) return DEV_SUBMIT_HS_START_ID;
     if (isDevSubmit) return DEV_SUBMIT_START_ID;
+    if (isDevGoalWorkstyle) return DEV_GOAL_WORKSTYLE_START_ID;
     if (isDevMindset) return DEV_MINDSET_START_ID;
     return set.firstId;
   });
-  // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs のとき history を
-  //   「ORIGIN→GOAL→MINDSET 14 問」で初期化(進捗バーの ProgressSnapshot が
-  //   「ORIGIN/GOAL は完了済み・MINDSET の最後の 1 問だけ残っている」状態を正しく表示するため。
-  //   getProgress は history+currentId からセクション内位置を計算する)。
+  // TODO(temp): 確認完了後に削除予定 — dev=submit / submit_hs / goal_workstyle のとき history を
+  //   「開始質問の手前まで」で初期化(進捗バーの ProgressSnapshot が
+  //   セクション内の正しい位置を表示するため。getProgress は history+currentId から計算する)。
   const [history, setHistory] = useState<string[]>(() => {
     if (isDevSubmitHs) {
       return buildHistoryUpTo(set, DEV_SUBMIT_HS_PREFILL_ANSWERS, DEV_SUBMIT_HS_START_ID);
     }
     if (isDevSubmit) {
       return buildHistoryUpTo(set, DEV_SUBMIT_PREFILL_ANSWERS, DEV_SUBMIT_START_ID);
+    }
+    if (isDevGoalWorkstyle) {
+      return buildHistoryUpTo(
+        set,
+        DEV_GOAL_WORKSTYLE_PREFILL_ANSWERS,
+        DEV_GOAL_WORKSTYLE_START_ID,
+      );
     }
     return [];
   });
