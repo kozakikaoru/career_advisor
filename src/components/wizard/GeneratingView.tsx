@@ -537,8 +537,26 @@ function Particles() {
   );
 }
 
-export function GeneratingView({ status = "loading" }: { status?: Status }) {
-  const fraction = useFakeProgress(status);
+export function GeneratingView({
+  status = "loading",
+  progressOverride,
+}: {
+  status?: Status;
+  /**
+   * TODO(temp): README スクショ撮影用 — 確認完了後に削除予定(?dev=loading_mid ショートカット)
+   * 指定された場合は useFakeProgress を bypass し、その fraction(0..1)で固定表示する。
+   * Headless Chrome で撮影する際にリアルタイム進行ではなく即時固定値を表示するため。
+   */
+  progressOverride?: number;
+}) {
+  const liveFraction = useFakeProgress(status);
+  // TODO(temp): README スクショ撮影用 — 確認完了後に削除予定
+  // progressOverride が指定されたら setInterval / RAF を起動した結果を捨てて固定値を使う。
+  // useFakeProgress 自体は依存配列の hook 規約上、無条件で呼ぶ必要があるためそのまま回す。
+  const fraction =
+    typeof progressOverride === "number"
+      ? Math.max(0, Math.min(1, progressOverride))
+      : liveFraction;
   const error = status === "error";
   const success = status === "success";
   const percent = Math.min(100, Math.round(fraction * 100));
